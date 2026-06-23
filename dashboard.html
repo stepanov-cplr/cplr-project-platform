@@ -125,6 +125,29 @@
   .state { padding: 40px 16px; text-align: center; color: var(--ink-soft); font-size: 14px; }
   .state.err { color: var(--danger); }
   .hidden { display: none !important; }
+
+  /* інтерактив: задачі */
+  .task .box.editable { cursor: pointer; transition: border-color .12s, background .12s; }
+  .task .box.editable:hover { border-color: var(--ok); background: var(--ok-bg); }
+  .task.done .box.editable:hover { background: var(--line-soft); }
+
+  /* інтерактив: заміри */
+  .add-meas { font: inherit; font-size: 11px; padding: 2px 9px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--accent); cursor: pointer; white-space: nowrap; }
+  .add-meas:hover { background: var(--brand-soft); border-color: var(--accent); }
+  .meas-form { margin-top: 8px; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+  .meas-form .mf-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .meas-form input { font: inherit; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .meas-form .m-period { width: 110px; } .meas-form .m-value { width: 130px; } .meas-form .m-comment { flex: 1; min-width: 140px; }
+  .meas-form .mf-actions { margin-top: 8px; display: flex; gap: 8px; }
+  .meas-form .m-save { font: inherit; font-size: 12.5px; padding: 6px 14px; border: none; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+  .meas-form .m-save:disabled { opacity: .5; cursor: default; }
+  .meas-form .m-cancel { font: inherit; font-size: 12.5px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink-soft); cursor: pointer; }
+
+  /* тост */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0; pointer-events: none; background: var(--ink); color: #fff; font-size: 13.5px; padding: 11px 20px; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.25); transition: opacity .2s, transform .2s; z-index: 999; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.ok { background: var(--ok); } .toast.err { background: var(--danger); }
+
   .switcher { margin-bottom: 16px; }
   .switcher select { font: inherit; font-size: 13px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; max-width: 100%; }
 </style>
@@ -201,6 +224,8 @@ var authToken = null;
 var currentProjectId = null;
 var expanded = {}; // code -> bool (відкриті вузли)
 var _lastData = null;
+var myEmail = null;    // надійний email беремо з токена; права — на бекенді
+var myRole = null;     // role з getProject (lead/member/finance) — лише для показу контролів
 
 // ── auth (як у index.html) ──
 function initGoogle() {
@@ -222,6 +247,7 @@ function onCredential(resp) {
   var info = decodeJwt(resp.credential);
   if (!info || !info.email) { showLoginErr("Не вдалося отримати email."); return; }
   authToken = resp.credential;
+  myEmail = String(info.email).toLowerCase().trim();
   localStorage.setItem("cplr_pp_token", authToken);
   document.getElementById("meEmail").textContent = info.email;
   boot();
@@ -291,6 +317,27 @@ function loadProject(pid) {
     .catch(function (e) { show("screenApp"); document.getElementById("tree").innerHTML = '<div class="state err">' + esc(String(e)) + '</div>'; });
 }
 
+// ── запис (POST, стиль системи заходів: text/plain, тіло JSON) ──
+function apiPost(action, payload) {
+  var body = JSON.stringify(Object.assign({ action: action, authToken: authToken }, payload || {}));
+  return fetch(BACKEND_URL, { method: "POST", redirect: "follow", headers: { "Content-Type": "text/plain" }, body: body })
+    .then(function (r) { return r.text(); })
+    .then(function (t) { try { return JSON.parse(t); } catch (e) { return { error: "BAD_RESPONSE", raw: t }; } });
+}
+
+// невеликий тост
+function toast(msg, kind) {
+  var el = document.getElementById("toast");
+  if (!el) { el = document.createElement("div"); el.id = "toast"; document.body.appendChild(el); }
+  el.textContent = msg;
+  el.className = "toast show" + (kind ? " " + kind : "");
+  clearTimeout(el._t);
+  el._t = setTimeout(function () { el.className = "toast"; }, 3000);
+}
+
+// перезавантажити поточний проєкт після запису (оновити прогрес/свіжість/статуси)
+function reloadCurrent() { loadProject(currentProjectId); }
+
 // ── утиліти ──
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]; }); }
 function daysUntil(dateStr) {
@@ -322,6 +369,7 @@ function monthToDate(startDate, monthN) {
 // ── головний рендер ──
 function renderProject(d) {
   _lastData = d;
+  myRole = d.role || "member";
   var p = d.project || {};
   document.getElementById("pName").textContent = p.name || "Проєкт";
   var statusCls = (p.status === "active") ? "active" : (p.status === "closed") ? "closed" : "draft";
@@ -415,7 +463,8 @@ function renderProject(d) {
     byParent[k].sort(function (a, b) { return (Number(a.display_order) || 0) - (Number(b.display_order) || 0); });
   });
 
-  var ctx = { byParent: byParent, indByParent: indByParent, tasksByAct: tasksByAct, measByInd: measByInd, project: p };
+  var ctx = { byParent: byParent, indByParent: indByParent, tasksByAct: tasksByAct, measByInd: measByInd, project: p,
+              myEmail: myEmail, myRole: myRole };
   var roots = byParent["__root__"] || [];
   var html = roots.map(function (n) { return renderNode(n, ctx, 0); }).join("");
   document.getElementById("tree").innerHTML = html || '<div class="empty state">Logframe порожній.</div>';
@@ -484,7 +533,7 @@ function renderNode(n, ctx, depth) {
   var inner = "";
   if (open) {
     if (inds.length) inner += renderIndicators(inds, ctx);
-    if (acts.length) inner += renderTasks(acts, ctx.project);
+    if (acts.length) inner += renderTasks(acts, ctx);
     if (children.length) inner += '<div class="node-children">' + children.map(function (c) { return renderNode(c, ctx, depth + 1); }).join("") + '</div>';
   }
 
@@ -506,19 +555,27 @@ function renderIndicators(inds, ctx) {
     var freshTxt = (lastTs == null) ? "немає замірів"
       : ds === 0 ? "оновлено сьогодні"
       : "оновлено " + ds + " " + plural(ds, "день тому", "дні тому", "днів тому");
+    // право вносити замір (для показу): owner індикатора АБО lead. Захист — на бекенді.
+    var canMeasure = ctx.myRole === "lead" ||
+                     String(i.owner_email || "").toLowerCase().trim() === ctx.myEmail;
     return '<div class="ind' + (stale ? ' stale-node' : '') + '">' +
         '<div class="ihead"><span class="iname">' + esc(i.name) + '</span>' +
         '<span class="ivals">' + esc(current) + ' / ' + esc(target) + ' ' + esc(i.unit || "") +
           (i.target_year ? ' · ' + esc(i.target_year) : '') + '</span></div>' +
         '<div class="bar ' + barCls + '"><span style="width:' + Math.min(100, Math.max(2, pct)) + '%"></span></div>' +
         '<div class="ifoot"><span>' + pct + '%</span>' +
-          '<span class="' + (stale ? 'fresh-stale' : '') + '">' + (stale ? '⏳ ' : '') + freshTxt + '</span></div>' +
+          '<span style="display:flex;gap:10px;align-items:center">' +
+            '<span class="' + (stale ? 'fresh-stale' : '') + '">' + (stale ? '⏳ ' : '') + freshTxt + '</span>' +
+            (canMeasure ? '<button class="add-meas" data-ind="' + esc(i.id) + '" data-unit="' + esc(i.unit || "") + '">+ замір</button>' : '') +
+          '</span>' +
+        '</div>' +
+        '<div class="meas-form hidden" data-form="' + esc(i.id) + '"></div>' +
       '</div>';
   }).join("");
   return '<div class="ind-block">' + rows + '</div>';
 }
 
-function renderTasks(tasks, project) {
+function renderTasks(tasks, ctx) {
   tasks.sort(function (a, b) { return new Date(a.due_date) - new Date(b.due_date); });
   var rows = tasks.map(function (t) {
     var done = String(t.status).toLowerCase() === "done";
@@ -527,8 +584,15 @@ function renderTasks(tasks, project) {
     var who = String(t.owner_email || "").split("@")[0];
     var ts = daysSince(t.ts);
     var stale = !done && ts !== null && ts > STALE_DAYS;
+    // право міняти статус (для показу): учасник АБО owner АБО lead. Реальна перевірка — на бекенді.
+    var canEdit = ctx.myRole === "lead" ||
+                  emailInList(ctx.myEmail, t.participants) ||
+                  String(t.owner_email || "").toLowerCase().trim() === ctx.myEmail;
+    var nextStatus = done ? "pending" : "done";
     return '<div class="task ' + (done ? 'done' : '') + (ovd ? ' overdue' : '') + (stale ? ' stale-node' : '') + '">' +
-        '<span class="box"></span>' +
+        '<span class="box' + (canEdit ? ' editable' : '') + '"' +
+          (canEdit ? ' data-task="' + esc(t.id) + '" data-next="' + nextStatus + '" title="' + (done ? 'Відкрити задачу' : 'Позначити виконаною') + '"' : ' title="лише учасники можуть змінювати"') +
+        '></span>' +
         '<span class="tt">' + esc(t.title) + '</span>' +
         '<span class="who">' + esc(who) + '</span>' +
         '<span class="td">' + (ovd ? "прострочено " + Math.abs(du) + " дн." : fmtDate(t.due_date)) + '</span>' +
@@ -537,16 +601,124 @@ function renderTasks(tasks, project) {
   return '<div class="task-block">' + rows + '</div>';
 }
 
+// допоміжне для UI (дзеркало бекенду; справжній захист — на сервері)
+function emailInList(email, listStr) {
+  email = String(email || "").toLowerCase().trim();
+  if (!email) return false;
+  return String(listStr || "").toLowerCase().split(/[;,]/).map(function (s) { return s.trim(); }).filter(Boolean).indexOf(email) >= 0;
+}
+
+// делегований обробник на дереві — чіпляється ОДИН раз (treeBound),
+// бо дерево перемальовується при згортанні й після запису.
+var treeBound = false;
 function bindTree() {
-  document.querySelectorAll(".node-head").forEach(function (h) {
-    h.addEventListener("click", function () {
-      var code = h.getAttribute("data-code");
-      var tw = h.querySelector(".tw").textContent.trim();
-      if (!tw) return; // лист без дітей — нічого не розгортати
-      expanded[code] = (tw === '▸'); // ▸ закрито → відкриваємо; ▾ відкрито → закриваємо
-      if (_lastData) renderProject(_lastData); // перерендер зі збереженим станом
-    });
+  if (treeBound) return;
+  treeBound = true;
+  var tree = document.getElementById("tree");
+
+  tree.addEventListener("click", function (ev) {
+    var t = ev.target;
+
+    // 1) згорнути/розгорнути вузол
+    var head = t.closest(".node-head");
+    if (head && !t.closest(".task") && !t.closest(".ind")) {
+      var code = head.getAttribute("data-code");
+      var tw = head.querySelector(".tw").textContent.trim();
+      if (!tw) return;
+      expanded[code] = (tw === '▸');
+      if (_lastData) renderProject(_lastData);
+      return;
+    }
+
+    // 2) перемкнути статус задачі
+    var box = t.closest(".box.editable");
+    if (box) {
+      var taskId = box.getAttribute("data-task");
+      var next = box.getAttribute("data-next");
+      box.style.opacity = "0.4";
+      apiPost("setTaskStatus", { taskId: taskId, status: next }).then(function (res) {
+        if (res && res.ok) { toast(next === "done" ? "Задачу закрито" : "Задачу відкрито", "ok"); reloadCurrent(); }
+        else { toast(errMsg(res), "err"); box.style.opacity = ""; }
+      });
+      return;
+    }
+
+    // 3) відкрити/сховати форму заміру
+    var addBtn = t.closest(".add-meas");
+    if (addBtn) {
+      var indId = addBtn.getAttribute("data-ind");
+      var unit = addBtn.getAttribute("data-unit");
+      var form = tree.querySelector('.meas-form[data-form="' + cssEsc(indId) + '"]');
+      if (!form) return;
+      if (!form.classList.contains("hidden")) { form.classList.add("hidden"); form.innerHTML = ""; return; }
+      form.innerHTML = measFormHtml(indId, unit);
+      form.classList.remove("hidden");
+      var vi = form.querySelector(".m-value"); if (vi) vi.focus();
+      return;
+    }
+
+    // 4) кнопки всередині форми заміру
+    var save = t.closest(".m-save");
+    if (save) { submitMeasurement(save.getAttribute("data-ind")); return; }
+    var cancel = t.closest(".m-cancel");
+    if (cancel) {
+      var f = tree.querySelector('.meas-form[data-form="' + cssEsc(cancel.getAttribute("data-ind")) + '"]');
+      if (f) { f.classList.add("hidden"); f.innerHTML = ""; }
+      return;
+    }
   });
+}
+
+function cssEsc(s) { return String(s).replace(/["\\]/g, "\\$&"); }
+
+function defaultPeriod() {
+  var d = new Date();
+  return d.getFullYear() + "-Q" + (Math.floor(d.getMonth() / 3) + 1);
+}
+
+function measFormHtml(indId, unit) {
+  return '<div class="mf-row">' +
+      '<input class="m-period" type="text" value="' + esc(defaultPeriod()) + '" placeholder="період (2026-Q3)">' +
+      '<input class="m-value" type="number" step="any" placeholder="значення' + (unit ? ", " + esc(unit) : "") + '">' +
+      '<input class="m-comment" type="text" placeholder="коментар (необов.)">' +
+    '</div>' +
+    '<div class="mf-actions">' +
+      '<button class="m-save" data-ind="' + esc(indId) + '">Зберегти</button>' +
+      '<button class="m-cancel" data-ind="' + esc(indId) + '">Скасувати</button>' +
+    '</div>';
+}
+
+function submitMeasurement(indId) {
+  var tree = document.getElementById("tree");
+  var form = tree.querySelector('.meas-form[data-form="' + cssEsc(indId) + '"]');
+  if (!form) return;
+  var period = form.querySelector(".m-period").value.trim();
+  var value = form.querySelector(".m-value").value;
+  var comment = form.querySelector(".m-comment").value.trim();
+  if (!period) { toast("Вкажіть період", "err"); return; }
+  if (value === "" || isNaN(Number(value))) { toast("Значення має бути числом", "err"); return; }
+  var saveBtn = form.querySelector(".m-save");
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "…"; }
+  apiPost("addMeasurement", { indicatorId: indId, period: period, value: Number(value), comment: comment }).then(function (res) {
+    if (res && res.ok) { toast("Замір збережено", "ok"); reloadCurrent(); }
+    else { toast(errMsg(res), "err"); if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Зберегти"; } }
+  });
+}
+
+function errMsg(res) {
+  if (!res) return "Немає відповіді від сервера";
+  var map = {
+    AUTH_REQUIRED: "Сесія застаріла — увійдіть знову",
+    ACCESS_DENIED: "Немає доступу до проєкту",
+    NOT_PARTICIPANT: "Лише учасники задачі можуть її змінювати",
+    NOT_OWNER: "Лише власник індикатора може вносити заміри",
+    NOT_FOUND: "Запис не знайдено",
+    BAD_STATUS: "Недопустимий статус",
+    BAD_VALUE: "Значення має бути числом",
+    BAD_REQUEST: "Некоректний запит"
+  };
+  if (res.error === "AUTH_REQUIRED") { logout(); }
+  return map[res.error] || ("Помилка: " + (res.message || res.error || "невідомо"));
 }
 
 // ── старт ──
@@ -557,7 +729,7 @@ window.addEventListener("load", function () {
     var info = decodeJwt(saved);
     if (info && info.exp && info.exp * 1000 > Date.now()) {
       authToken = saved;
-      if (info.email) document.getElementById("meEmail").textContent = info.email;
+      if (info.email) { myEmail = String(info.email).toLowerCase().trim(); document.getElementById("meEmail").textContent = info.email; }
       boot();
     } else { localStorage.removeItem("cplr_pp_token"); show("screenLogin"); }
   } else { show("screenLogin"); }
