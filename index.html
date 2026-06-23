@@ -3,74 +3,48 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Проєктна платформа ЦППР — Мій понеділок</title>
+<title>Проєктна платформа ЦППР</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root {
-    --ink: #1a1d29;
-    --ink-soft: #5a6072;
-    --ink-faint: #9097a8;
-    --line: #e4e7ef;
-    --line-soft: #eef0f6;
-    --bg: #f7f8fb;
-    --card: #ffffff;
-    --brand: #252868;
-    --brand-soft: #eeedfe;
-    --accent: #1c75bc;
-    --danger: #c0392b;
-    --danger-bg: #fdf0ee;
-    --warn: #b9770e;
-    --warn-bg: #fdf6e9;
-    --ok: #1d7a54;
-    --ok-bg: #e9f5ef;
-    --radius: 12px;
-    --radius-sm: 8px;
+    --ink: #1a1d29; --ink-soft: #5a6072; --ink-faint: #9097a8;
+    --line: #e4e7ef; --line-soft: #eef0f6; --bg: #f7f8fb; --card: #ffffff;
+    --brand: #252868; --brand-soft: #eeedfe; --accent: #1c75bc;
+    --danger: #c0392b; --danger-bg: #fdf0ee;
+    --warn: #b9770e; --warn-bg: #fdf6e9;
+    --ok: #1d7a54; --ok-bg: #e9f5ef;
+    --radius: 12px; --radius-sm: 8px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background: var(--bg);
-    color: var(--ink);
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
+    background: var(--bg); color: var(--ink); line-height: 1.5; -webkit-font-smoothing: antialiased;
   }
   .wrap { max-width: 760px; margin: 0 auto; padding: 24px 20px 64px; }
-
-  /* Тестова панель — прибереться, коли підключимо вхід */
-  .testbar {
-    background: #fff8e6; border: 1px solid #f0dca8;
-    border-radius: var(--radius-sm); padding: 12px 14px;
-    font-size: 13px; color: #7a5c12; margin-bottom: 24px;
-    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-  }
-  .testbar select, .testbar input {
-    font: inherit; padding: 5px 9px; border: 1px solid #e0cf9a;
-    border-radius: 6px; background: #fff; color: var(--ink);
-  }
-  .testbar button {
-    font: inherit; font-size: 13px; padding: 5px 14px; border: none;
-    border-radius: 6px; background: var(--brand); color: #fff; cursor: pointer;
-  }
-  .testbar button:hover { background: #1d1f52; }
-
+  .gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1C75BC, #252868); padding: 20px; }
+  .gate-card { background: #fff; border-radius: 16px; padding: 40px 36px; max-width: 380px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .gate-card h1 { font-size: 20px; color: var(--brand); margin-bottom: 6px; }
+  .gate-card p { font-size: 13px; color: var(--ink-soft); margin-bottom: 18px; line-height: 1.5; }
+  .gate-card .mark { font-size: 32px; margin-bottom: 10px; }
+  .gate-card .signin-slot { display: flex; justify-content: center; }
+  .gate-card .err { color: var(--danger); font-size: 12.5px; margin-top: 14px; }
+  .gate-card .note { font-size: 11px; color: var(--ink-faint); margin-top: 22px; }
+  .gate-card button.logout { font: inherit; font-size: 13px; margin-top: 18px; padding: 8px 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; color: var(--ink-soft); }
+  .appbar { display: flex; align-items: center; justify-content: space-between; max-width: 760px; margin: 0 auto; padding: 14px 20px 0; }
+  .appbar .me { font-size: 13px; color: var(--ink-soft); display: flex; align-items: center; gap: 10px; }
+  .appbar .me button { font: inherit; font-size: 12px; padding: 4px 11px; border: 1px solid var(--line); border-radius: 7px; background: #fff; cursor: pointer; color: var(--ink-soft); }
+  .appbar .me button:hover { background: var(--line-soft); }
   header.page { margin-bottom: 22px; }
   header.page h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
   header.page .sub { color: var(--ink-soft); font-size: 14px; margin-top: 3px; }
-
-  /* Лічильники */
   .counts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
   .count { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
   .count .n { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
   .count .l { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
   .count.danger .n { color: var(--danger); }
   .count.warn .n { color: var(--warn); }
-
-  .section-title {
-    font-size: 13px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.04em; color: var(--ink-faint);
-    margin: 0 2px 10px; display: flex; align-items: center; gap: 8px;
-  }
+  .section-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint); margin: 0 2px 10px; display: flex; align-items: center; gap: 8px; }
   .section-title .cnt { color: var(--ink-faint); font-weight: 500; }
-
   .list { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-bottom: 28px; }
   .row { display: flex; align-items: center; gap: 14px; padding: 13px 16px; border-top: 1px solid var(--line-soft); }
   .row:first-child { border-top: none; }
@@ -80,78 +54,139 @@
   .row .when { text-align: right; flex-shrink: 0; white-space: nowrap; }
   .row .when .d { font-size: 13px; }
   .row .when .date { font-size: 11.5px; color: var(--ink-faint); margin-top: 1px; }
-
   .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 500; }
   .pill.financial { background: var(--brand-soft); color: var(--brand); }
   .pill.narrative { background: var(--ok-bg); color: var(--ok); }
-
   .row.overdue { background: var(--danger-bg); }
   .row.overdue .d { color: var(--danger); font-weight: 600; }
   .row.soon .d { color: var(--warn); font-weight: 600; }
   .row.normal .d { color: var(--ink-soft); }
-
   .empty { padding: 28px 16px; text-align: center; color: var(--ink-faint); font-size: 14px; }
   .state { padding: 40px 16px; text-align: center; color: var(--ink-soft); font-size: 14px; }
   .state.err { color: var(--danger); }
-
-  @media (max-width: 520px) {
-    .counts { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-    .count { padding: 12px; }
-    .count .n { font-size: 22px; }
-  }
+  .hidden { display: none !important; }
+  @media (max-width: 520px) { .counts { grid-template-columns: 1fr 1fr 1fr; gap: 8px; } .count { padding: 12px; } .count .n { font-size: 22px; } }
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <!-- ТЕСТОВА ПАНЕЛЬ: тимчасова, поки немає Google-входу.
-       Email обирається вручну. Коли підключимо вхід — цей блок видаляється,
-       а email братиметься з токена. -->
-  <div class="testbar">
-    <span>Тест без входу. Email:</span>
-    <select id="emailPick">
-      <option value="stepanov@pravo.org.ua">stepanov (lead, адмін)</option>
-      <option value="melnyk@pravo.org.ua">melnyk (lead)</option>
-      <option value="dubiniak@pravo.org.ua">dubiniak (member)</option>
-      <option value="vynohradova@pravo.org.ua">vynohradova (member)</option>
-      <option value="novak@pravo.org.ua">novak (member)</option>
-      <option value="dmitro@pravo.org.ua">dmitro (finance)</option>
-    </select>
-    <button onclick="loadMyMonday()">Завантажити</button>
+<div class="gate" id="screenLogin">
+  <div class="gate-card">
+    <div class="mark">📋</div>
+    <h1>Проєктна платформа</h1>
+    <p>Центр політико-правових реформ</p>
+    <p>Для доступу увійдіть через робочий Google-акаунт ЦППР.</p>
+    <div class="signin-slot" id="gsiButton"></div>
+    <div class="err" id="loginErr"></div>
+    <div class="note">Доступ лише для команди проєктів. Якщо не можете увійти — зверніться до адміністратора.</div>
   </div>
+</div>
 
-  <header class="page">
-    <h1>Мій понеділок</h1>
-    <div class="sub" id="who">—</div>
-  </header>
-
-  <div class="counts">
-    <div class="count danger"><div class="n" id="cOverdue">—</div><div class="l">Прострочено</div></div>
-    <div class="count warn"><div class="n" id="cWeek">—</div><div class="l">Цього тижня</div></div>
-    <div class="count"><div class="n" id="cReports">—</div><div class="l">Звіти на мені</div></div>
+<div class="gate hidden" id="screenDenied">
+  <div class="gate-card">
+    <div class="mark">🚫</div>
+    <h1 style="color:var(--danger)">Доступу немає</h1>
+    <p id="deniedEmail">—</p>
+    <p>Цей акаунт не має доступу до жодного проєкту. Зверніться до адміністратора, щоб вас додали.</p>
+    <button class="logout" onclick="logout()">Вийти</button>
   </div>
+</div>
 
-  <div class="section-title">Мої задачі <span class="cnt" id="taskCnt"></span></div>
-  <div class="list" id="taskList">
-    <div class="state">Обери email і натисни «Завантажити».</div>
+<div class="gate hidden" id="screenLoading">
+  <div class="gate-card">
+    <div class="mark">⏳</div>
+    <p style="margin:0">Завантаження…</p>
   </div>
+</div>
 
-  <div class="section-title">Дедлайни звітування <span class="cnt" id="repCnt"></span></div>
-  <div class="list" id="repList">
-    <div class="state">—</div>
+<div class="hidden" id="screenApp">
+  <div class="appbar">
+    <div></div>
+    <div class="me"><span id="meEmail">—</span><button onclick="logout()">Вийти</button></div>
   </div>
-
+  <div class="wrap">
+    <header class="page">
+      <h1>Мій понеділок</h1>
+      <div class="sub" id="who">—</div>
+    </header>
+    <div class="counts">
+      <div class="count danger"><div class="n" id="cOverdue">—</div><div class="l">Прострочено</div></div>
+      <div class="count warn"><div class="n" id="cWeek">—</div><div class="l">Цього тижня</div></div>
+      <div class="count"><div class="n" id="cReports">—</div><div class="l">Звіти на мені</div></div>
+    </div>
+    <div class="section-title">Мої задачі <span class="cnt" id="taskCnt"></span></div>
+    <div class="list" id="taskList"><div class="state">—</div></div>
+    <div class="section-title">Дедлайни звітування <span class="cnt" id="repCnt"></span></div>
+    <div class="list" id="repList"><div class="state">—</div></div>
+  </div>
 </div>
 
 <script>
 // ════════════════════════════════════════════════════════
-// КОНФІГ: встав сюди URL свого Web app (з Deploy → Web app, рядок /exec)
+// КОНФІГ
 const BACKEND_URL = "https://script.google.com/macros/s/AKfycbzwJLuPeHYiu7oJGZIr-d6vTe4NB22it9Cs4nSzW1Xjf4KTDkf7bbAp7X7oEIDhUeJQ/exec";
+const GOOGLE_CLIENT_ID = "480913215993-h8o3gcsismg88cjg7h7e48h9o8gpj45r.apps.googleusercontent.com";
 // ════════════════════════════════════════════════════════
+
+var authToken = null;
+
+function initGoogle() {
+  if (!(window.google && window.google.accounts && window.google.accounts.id)) { setTimeout(initGoogle, 200); return; }
+  window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onCredential });
+  window.google.accounts.id.renderButton(document.getElementById("gsiButton"),
+    { theme: "filled_blue", size: "large", text: "signin_with", locale: "uk", width: 280 });
+}
+
+function decodeJwt(token) {
+  try {
+    var base = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    var json = decodeURIComponent(atob(base).split("").map(function (c) {
+      return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(""));
+    return JSON.parse(json);
+  } catch (e) { return null; }
+}
+
+function onCredential(resp) {
+  var token = resp.credential;
+  var info = decodeJwt(token);
+  if (!info || !info.email) { showLoginErr("Не вдалося отримати email з акаунту."); return; }
+  authToken = token;
+  localStorage.setItem("cplr_pp_token", token);
+  show("screenLoading");
+  loadMyMonday();
+}
+
+function showLoginErr(msg) { document.getElementById("loginErr").textContent = msg; }
+
+function logout() {
+  authToken = null;
+  localStorage.removeItem("cplr_pp_token");
+  if (window.google && window.google.accounts && window.google.accounts.id) { window.google.accounts.id.disableAutoSelect(); }
+  show("screenLogin");
+}
+
+function show(id) {
+  ["screenLogin", "screenDenied", "screenLoading", "screenApp"].forEach(function (s) {
+    document.getElementById(s).classList.toggle("hidden", s !== id);
+  });
+}
+
+function loadMyMonday() {
+  var url = BACKEND_URL + "?action=getMyMonday&authToken=" + encodeURIComponent(authToken);
+  fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+    if (data.error === "AUTH_REQUIRED") { showLoginErr("Сесія застаріла, увійдіть знову."); show("screenLogin"); return; }
+    render(data);
+    show("screenApp");
+  }).catch(function (err) {
+    show("screenLogin");
+    showLoginErr("Не вдалося з'єднатися з бекендом. " + err);
+  });
+}
 
 function fmtDays(days) {
   if (days === null || days === undefined) return { cls: "normal", txt: "—" };
-  if (days < 0)  return { cls: "overdue", txt: "прострочено " + Math.abs(days) + " дн." };
+  if (days < 0) return { cls: "overdue", txt: "прострочено " + Math.abs(days) + " дн." };
   if (days === 0) return { cls: "soon", txt: "сьогодні" };
   if (days <= 7) return { cls: "soon", txt: "за " + days + " дн." };
   return { cls: "normal", txt: "за " + days + " дн." };
@@ -163,74 +198,52 @@ function esc(s) {
   });
 }
 
-function loadMyMonday() {
-  var email = document.getElementById("emailPick").value;
-  document.getElementById("who").textContent = "Завантаження…";
-  setBusy();
-
-  var url = BACKEND_URL + "?action=getMyMonday&testEmail=" + encodeURIComponent(email);
-  fetch(url)
-    .then(function (r) { return r.json(); })
-    .then(function (data) { render(data); })
-    .catch(function (err) {
-      document.getElementById("taskList").innerHTML =
-        '<div class="state err">Не вдалося з\'єднатися з бекендом. Перевір BACKEND_URL і деплой. (' + esc(err) + ')</div>';
-      document.getElementById("repList").innerHTML = "";
-      document.getElementById("who").textContent = "—";
-    });
-}
-
-function setBusy() {
-  document.getElementById("taskList").innerHTML = '<div class="state">Завантаження…</div>';
-  document.getElementById("repList").innerHTML = '<div class="state">Завантаження…</div>';
-}
-
 function render(d) {
   if (d.error) {
     document.getElementById("taskList").innerHTML = '<div class="state err">Помилка: ' + esc(d.error) + '</div>';
     document.getElementById("repList").innerHTML = "";
     return;
   }
+  document.getElementById("meEmail").textContent = d.email || "—";
   document.getElementById("who").textContent = d.email || "—";
   document.getElementById("cOverdue").textContent = d.overdue != null ? d.overdue : 0;
   document.getElementById("cWeek").textContent = d.thisWeek != null ? d.thisWeek : 0;
   document.getElementById("cReports").textContent = (d.reports || []).length;
 
-  // Задачі
   var tasks = d.tasks || [];
   document.getElementById("taskCnt").textContent = tasks.length ? "(" + tasks.length + ")" : "";
-  if (!tasks.length) {
-    document.getElementById("taskList").innerHTML =
-      '<div class="empty">Немає відкритих задач. Чисто.</div>';
-  } else {
-    document.getElementById("taskList").innerHTML = tasks.map(function (t) {
-      var f = fmtDays(t.days);
-      return '<div class="row ' + f.cls + '">' +
-        '<div class="body"><div class="title">' + esc(t.title) + '</div>' +
-        '<div class="meta">' + esc(t.project) + (t.conditional ? ' · умовна' : '') + '</div></div>' +
-        '<div class="when"><div class="d">' + f.txt + '</div>' +
-        '<div class="date">' + esc(t.due_date) + '</div></div></div>';
-    }).join("");
-  }
+  document.getElementById("taskList").innerHTML = tasks.length
+    ? tasks.map(function (t) {
+        var f = fmtDays(t.days);
+        return '<div class="row ' + f.cls + '"><div class="body"><div class="title">' + esc(t.title) +
+          '</div><div class="meta">' + esc(t.project) + (t.conditional ? ' · умовна' : '') +
+          '</div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + esc(t.due_date) + '</div></div></div>';
+      }).join("")
+    : '<div class="empty">Немає відкритих задач. Чисто.</div>';
 
-  // Звіти
   var reps = d.reports || [];
   document.getElementById("repCnt").textContent = reps.length ? "(" + reps.length + ")" : "";
-  if (!reps.length) {
-    document.getElementById("repList").innerHTML =
-      '<div class="empty">Немає найближчих звітів.</div>';
-  } else {
-    document.getElementById("repList").innerHTML = reps.map(function (r) {
-      var f = fmtDays(r.days);
-      var kindLabel = r.kind === "financial" ? "фінансовий" : "змістовний";
-      return '<div class="row ' + f.cls + '">' +
-        '<div class="body"><div class="title">' + esc(r.label) + '</div>' +
-        '<div class="meta">' + esc(r.project) + ' · <span class="pill ' + esc(r.kind) + '">' + kindLabel + '</span></div></div>' +
-        '<div class="when"><div class="d">' + f.txt + '</div>' +
-        '<div class="date">' + esc(r.due_date) + '</div></div></div>';
-    }).join("");
-  }
+  document.getElementById("repList").innerHTML = reps.length
+    ? reps.map(function (r) {
+        var f = fmtDays(r.days);
+        var kindLabel = r.kind === "financial" ? "фінансовий" : "змістовний";
+        return '<div class="row ' + f.cls + '"><div class="body"><div class="title">' + esc(r.label) +
+          '</div><div class="meta">' + esc(r.project) + ' · <span class="pill ' + esc(r.kind) + '">' + kindLabel +
+          '</span></div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + esc(r.due_date) + '</div></div></div>';
+      }).join("")
+    : '<div class="empty">Немає найближчих звітів.</div>';
 }
+
+window.addEventListener("load", function () {
+  initGoogle();
+  var saved = localStorage.getItem("cplr_pp_token");
+  if (saved) {
+    var info = decodeJwt(saved);
+    if (info && info.exp && info.exp * 1000 > Date.now()) {
+      authToken = saved; show("screenLoading"); loadMyMonday();
+    } else { localStorage.removeItem("cplr_pp_token"); show("screenLogin"); }
+  } else { show("screenLogin"); }
+});
 </script>
 </body>
 </html>
