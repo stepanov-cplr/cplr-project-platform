@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Дашборд проєкту — Проєктна платформа ЦППР</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root {
+    --ink: #1a1d29; --ink-soft: #5a6072; --ink-faint: #9097a8;
+    --line: #e4e7ef; --line-soft: #eef0f6; --bg: #f7f8fb; --card: #ffffff;
+    --brand: #252868; --brand-soft: #eeedfe; --accent: #1c75bc;
+    --danger: #c0392b; --danger-bg: #fdf0ee;
+    --warn: #b9770e; --warn-bg: #fdf6e9;
+    --ok: #1d7a54; --ok-bg: #e9f5ef;
+    --radius: 12px; --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.5; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 20px 20px 64px; }
+  .gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1C75BC, #252868); padding: 20px; }
+  .gate-card { background: #fff; border-radius: 16px; padding: 40px 36px; max-width: 380px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .gate-card .mark { font-size: 32px; margin-bottom: 10px; }
+  .gate-card h1 { font-size: 20px; color: var(--brand); margin-bottom: 6px; }
+  .gate-card p { font-size: 13px; color: var(--ink-soft); margin-bottom: 18px; }
+  .gate-card .err { color: var(--danger); font-size: 12.5px; margin-top: 14px; }
+  .gate-card button.logout { font: inherit; font-size: 13px; margin-top: 18px; padding: 8px 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; color: var(--ink-soft); }
+  .signin-slot { display: flex; justify-content: center; }
+
+  .appbar { display: flex; align-items: center; justify-content: space-between; max-width: 920px; margin: 0 auto; padding: 14px 20px 0; }
+  .appbar a.back { font-size: 13px; color: var(--accent); text-decoration: none; }
+  .appbar a.back:hover { text-decoration: underline; }
+  .appbar .me { font-size: 13px; color: var(--ink-soft); display: flex; align-items: center; gap: 10px; }
+  .appbar .me button { font: inherit; font-size: 12px; padding: 4px 11px; border: 1px solid var(--line); border-radius: 7px; background: #fff; cursor: pointer; color: var(--ink-soft); }
+
+  /* проєкт-хедер */
+  header.proj { margin-bottom: 20px; }
+  header.proj h1 { font-size: 21px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; }
+  header.proj .meta { color: var(--ink-soft); font-size: 13.5px; margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; }
+  header.proj .meta b { color: var(--ink); font-weight: 600; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+  .badge.active { background: var(--ok-bg); color: var(--ok); }
+  .badge.draft { background: var(--line-soft); color: var(--ink-soft); }
+  .badge.closed { background: var(--danger-bg); color: var(--danger); }
+
+  /* картки стану */
+  .counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+  .count { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 15px; }
+  .count .n { font-size: 25px; font-weight: 600; letter-spacing: -0.02em; }
+  .count .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+  .count.danger .n { color: var(--danger); } .count.warn .n { color: var(--warn); } .count.ok .n { color: var(--ok); }
+
+  /* тривога несвіжості */
+  .stale-alert { background: var(--warn-bg); border: 1px solid #f0d9a8; border-radius: var(--radius); padding: 12px 16px; margin-bottom: 22px; font-size: 13.5px; color: var(--warn); display: flex; align-items: center; gap: 10px; }
+  .stale-alert.clean { background: var(--ok-bg); border-color: #bfe3d0; color: var(--ok); }
+
+  /* дедлайни звітів — дві стрічки */
+  .rep-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 26px; }
+  @media (max-width: 680px) { .rep-cols { grid-template-columns: 1fr; } .counts { grid-template-columns: 1fr 1fr; } }
+  .rep-col h3 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .rep-list { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .rep-row { padding: 10px 13px; border-top: 1px solid var(--line-soft); font-size: 13px; display: flex; justify-content: space-between; gap: 10px; }
+  .rep-row:first-child { border-top: none; }
+  .rep-row .lbl { min-width: 0; }
+  .rep-row .lbl .t { line-height: 1.3; }
+  .rep-row .when { white-space: nowrap; text-align: right; flex-shrink: 0; font-size: 12px; }
+  .rep-row.overdue { background: var(--danger-bg); } .rep-row.overdue .when { color: var(--danger); font-weight: 600; }
+  .rep-row.soon .when { color: var(--warn); font-weight: 600; }
+  .rep-row.done .lbl .t { color: var(--ink-faint); text-decoration: line-through; }
+  .rep-row.done .when { color: var(--ok); }
+
+  /* секція */
+  .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint); margin: 0 2px 12px; }
+
+  /* Logframe-дерево */
+  .tree { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 0; }
+  .node { border-top: 1px solid var(--line-soft); }
+  .node:first-child { border-top: none; }
+  .node-head { display: flex; align-items: flex-start; gap: 9px; padding: 10px 16px; cursor: pointer; }
+  .node-head:hover { background: var(--bg); }
+  .node-head .tw { width: 16px; flex-shrink: 0; color: var(--ink-faint); font-size: 11px; text-align: center; padding-top: 3px; }
+  .node-head .code { flex-shrink: 0; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 12.5px; color: var(--ink-soft); min-width: 34px; padding-top: 1px; }
+  .node-head .ttl { flex: 1; min-width: 0; font-size: 14px; }
+  .node-head .lvl { flex-shrink: 0; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 2px 7px; border-radius: 5px; margin-top: 1px; }
+  .lvl.impact { background: var(--brand-soft); color: var(--brand); }
+  .lvl.outcome { background: #e7f0fb; color: var(--accent); }
+  .lvl.output { background: var(--ok-bg); color: var(--ok); }
+  .lvl.activity { background: var(--warn-bg); color: var(--warn); }
+  .node-children { padding-left: 22px; }
+  .node.cond > .node-head .ttl { color: var(--ink-soft); }
+  .cond-tag { font-size: 10.5px; color: var(--warn); border: 1px solid #f0d9a8; border-radius: 5px; padding: 1px 5px; margin-left: 6px; white-space: nowrap; }
+  .act-dates { font-size: 11.5px; color: var(--ink-faint); margin-left: 6px; white-space: nowrap; }
+  .act-overdue { color: var(--danger); font-weight: 600; }
+
+  /* індикатори всередині вузла */
+  .ind-block { padding: 4px 16px 12px 60px; }
+  .ind { padding: 8px 0; border-top: 1px dashed var(--line); }
+  .ind:first-child { border-top: none; }
+  .ind .ihead { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .ind .iname { font-size: 13px; color: var(--ink); flex: 1; }
+  .ind .ivals { font-size: 12px; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .bar { height: 7px; background: var(--line-soft); border-radius: 4px; margin-top: 6px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; border-radius: 4px; }
+  .bar.green > span { background: var(--ok); } .bar.blue > span { background: var(--accent); } .bar.red > span { background: var(--danger); }
+  .ifoot { display: flex; justify-content: space-between; margin-top: 5px; font-size: 11px; color: var(--ink-faint); }
+  .fresh-dot { display: inline-block; }
+  .fresh-stale { color: var(--warn); font-weight: 600; }
+
+  /* задачі під активністю */
+  .task-block { padding: 2px 16px 12px 60px; }
+  .task { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-size: 13px; border-top: 1px dashed var(--line); }
+  .task:first-child { border-top: none; }
+  .task .box { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--line); flex-shrink: 0; }
+  .task.done .box { background: var(--ok); border-color: var(--ok); }
+  .task.done .tt { color: var(--ink-faint); text-decoration: line-through; }
+  .task .tt { flex: 1; min-width: 0; }
+  .task .td { font-size: 11.5px; color: var(--ink-faint); white-space: nowrap; }
+  .task.overdue .td { color: var(--danger); font-weight: 600; }
+  .task .who { font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
+  .stale-node { opacity: 0.55; }
+
+  .state { padding: 40px 16px; text-align: center; color: var(--ink-soft); font-size: 14px; }
+  .state.err { color: var(--danger); }
+  .hidden { display: none !important; }
+  .switcher { margin-bottom: 16px; }
+  .switcher select { font: inherit; font-size: 13px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; max-width: 100%; }
+</style>
+</head>
+<body>
+
+<div class="gate" id="screenLogin">
+  <div class="gate-card">
+    <div class="mark">📋</div>
+    <h1>Дашборд проєкту</h1>
+    <p>Увійдіть через Google-акаунт ЦППР.</p>
+    <div class="signin-slot" id="gsiButton"></div>
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<div class="gate hidden" id="screenLoading">
+  <div class="gate-card"><div class="mark">⏳</div><p style="margin:0">Завантаження…</p></div>
+</div>
+
+<div class="gate hidden" id="screenDenied">
+  <div class="gate-card">
+    <div class="mark">🚫</div>
+    <h1 style="color:var(--danger)">Доступу немає</h1>
+    <p id="deniedMsg">До цього проєкту немає доступу.</p>
+    <button class="logout" onclick="logout()">Вийти</button>
+  </div>
+</div>
+
+<div class="hidden" id="screenApp">
+  <div class="appbar">
+    <a class="back" href="index.html">← Мій понеділок</a>
+    <div class="me"><span id="meEmail">—</span><button onclick="logout()">Вийти</button></div>
+  </div>
+  <div class="wrap">
+    <div class="switcher hidden" id="switcher">
+      <select id="projSelect" onchange="onProjChange()"></select>
+    </div>
+
+    <header class="proj">
+      <h1 id="pName">—</h1>
+      <div class="meta" id="pMeta"></div>
+    </header>
+
+    <div class="counts" id="counts"></div>
+    <div id="staleAlert"></div>
+
+    <div class="section-title">Дедлайни звітування</div>
+    <div class="rep-cols">
+      <div class="rep-col">
+        <h3><span class="badge" style="background:var(--brand-soft);color:var(--brand)">фінансові</span></h3>
+        <div class="rep-list" id="repFin"></div>
+      </div>
+      <div class="rep-col">
+        <h3><span class="badge" style="background:var(--ok-bg);color:var(--ok)">змістовні</span></h3>
+        <div class="rep-list" id="repNarr"></div>
+      </div>
+    </div>
+
+    <div class="section-title">Logframe</div>
+    <div class="tree" id="tree"><div class="state">—</div></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+const BACKEND_URL = "https://script.google.com/macros/s/AKfycbzwJLuPeHYiu7oJGZIr-d6vTe4NB22it9Cs4nSzW1Xjf4KTDkf7bbAp7X7oEIDhUeJQ/exec";
+const GOOGLE_CLIENT_ID = "480913215993-h8o3gcsismg88cjg7h7e48h9o8gpj45r.apps.googleusercontent.com";
+const STALE_DAYS = 30;
+const PROJECT_START = new Date(2026, 0, 1); // запасний старт для конвертації місяців→дат, якщо в проєкті немає start_date
+// ════════════════════════════════════════════════════════
+
+var authToken = null;
+var currentProjectId = null;
+var expanded = {}; // code -> bool (відкриті вузли)
+var _lastData = null;
+
+// ── auth (як у index.html) ──
+function initGoogle() {
+  if (!(window.google && window.google.accounts && window.google.accounts.id)) { setTimeout(initGoogle, 200); return; }
+  window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onCredential });
+  window.google.accounts.id.renderButton(document.getElementById("gsiButton"),
+    { theme: "filled_blue", size: "large", text: "signin_with", locale: "uk", width: 280 });
+}
+function decodeJwt(token) {
+  try {
+    var base = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    var json = decodeURIComponent(atob(base).split("").map(function (c) {
+      return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(""));
+    return JSON.parse(json);
+  } catch (e) { return null; }
+}
+function onCredential(resp) {
+  var info = decodeJwt(resp.credential);
+  if (!info || !info.email) { showLoginErr("Не вдалося отримати email."); return; }
+  authToken = resp.credential;
+  localStorage.setItem("cplr_pp_token", authToken);
+  document.getElementById("meEmail").textContent = info.email;
+  boot();
+}
+function showLoginErr(m) { document.getElementById("loginErr").textContent = m; }
+function logout() {
+  authToken = null; localStorage.removeItem("cplr_pp_token");
+  if (window.google && window.google.accounts && window.google.accounts.id) window.google.accounts.id.disableAutoSelect();
+  show("screenLogin");
+}
+function show(id) {
+  ["screenLogin","screenLoading","screenDenied","screenApp"].forEach(function (s) {
+    document.getElementById(s).classList.toggle("hidden", s !== id);
+  });
+}
+
+// ── завантаження ──
+function qparam(name) {
+  var m = new RegExp("[?&]" + name + "=([^&]*)").exec(window.location.search);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function boot() {
+  show("screenLoading");
+  currentProjectId = qparam("project");
+  // спершу список проєктів (для перемикача й щоб знати, куди йти, якщо project не задано)
+  fetch(BACKEND_URL + "?action=getProjects&authToken=" + encodeURIComponent(authToken))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.error === "AUTH_REQUIRED") { logout(); showLoginErr("Сесія застаріла, увійдіть знову."); return; }
+      var projects = data.projects || [];
+      if (!projects.length) { document.getElementById("deniedMsg").textContent = "Цей акаунт не має доступу до жодного проєкту."; show("screenDenied"); return; }
+      buildSwitcher(projects);
+      if (!currentProjectId) currentProjectId = String(projects[0].id);
+      loadProject(currentProjectId);
+    })
+    .catch(function (e) { show("screenLogin"); showLoginErr("Бекенд недоступний. " + e); });
+}
+
+function buildSwitcher(projects) {
+  if (projects.length <= 1) return;
+  var sel = document.getElementById("projSelect");
+  sel.innerHTML = projects.map(function (p) {
+    return '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>';
+  }).join("");
+  document.getElementById("switcher").classList.remove("hidden");
+}
+function onProjChange() {
+  currentProjectId = document.getElementById("projSelect").value;
+  history.replaceState(null, "", "?project=" + encodeURIComponent(currentProjectId));
+  show("screenLoading");
+  loadProject(currentProjectId);
+}
+
+function loadProject(pid) {
+  fetch(BACKEND_URL + "?action=getProject&projectId=" + encodeURIComponent(pid) + "&authToken=" + encodeURIComponent(authToken))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.error === "AUTH_REQUIRED") { logout(); return; }
+      if (data.error === "ACCESS_DENIED") { show("screenDenied"); return; }
+      if (data.error) { show("screenApp"); document.getElementById("tree").innerHTML = '<div class="state err">Помилка: ' + esc(data.error) + '</div>'; return; }
+      var sel = document.getElementById("projSelect");
+      if (sel) sel.value = String(pid);
+      renderProject(data);
+      show("screenApp");
+    })
+    .catch(function (e) { show("screenApp"); document.getElementById("tree").innerHTML = '<div class="state err">' + esc(String(e)) + '</div>'; });
+}
+
+// ── утиліти ──
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]; }); }
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  var d = new Date(dateStr); if (isNaN(d)) return null;
+  var t = new Date(); t.setHours(0,0,0,0);
+  return Math.round((d - t) / 86400000);
+}
+function daysSince(dateStr) {
+  if (!dateStr) return null;
+  var d = new Date(dateStr); if (isNaN(d)) return null;
+  var t = new Date(); t.setHours(0,0,0,0);
+  return Math.round((t - d) / 86400000);
+}
+function isTrue(v) { return String(v).toUpperCase() === "TRUE"; }
+function fmtDate(s) {
+  if (!s) return "—";
+  var d = new Date(s); if (isNaN(d)) return esc(s);
+  return d.toLocaleDateString("uk-UA", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+// місяць N проєкту → приблизна дата кінця цього місяця (для overdue активностей без точних дат)
+function monthToDate(startDate, monthN) {
+  var base = startDate ? new Date(startDate) : PROJECT_START;
+  if (isNaN(base)) base = PROJECT_START;
+  var d = new Date(base.getFullYear(), base.getMonth() + (monthN - 1) + 1, 0); // кінець місяця
+  return d;
+}
+
+// ── головний рендер ──
+function renderProject(d) {
+  _lastData = d;
+  var p = d.project || {};
+  document.getElementById("pName").textContent = p.name || "Проєкт";
+  var statusCls = (p.status === "active") ? "active" : (p.status === "closed") ? "closed" : "draft";
+  var statusLbl = (p.status === "active") ? "активний" : (p.status === "closed") ? "закритий" : "чернетка";
+  document.getElementById("pMeta").innerHTML =
+    '<span class="badge ' + statusCls + '">' + statusLbl + '</span>' +
+    '<span>Донор: <b>' + esc(p.donor || "—") + '</b></span>' +
+    (p.budget_total ? '<span>Бюджет: <b>' + esc(Number(p.budget_total).toLocaleString("uk-UA")) + ' ' + esc(p.currency || "") + '</b></span>' : '') +
+    '<span>' + fmtDate(p.start_date) + ' — ' + fmtDate(p.end_date) + (p.months ? ' (' + esc(p.months) + ' міс.)' : '') + '</span>';
+
+  var logframe = d.logframe || [];
+  var indicators = d.indicators || [];
+  var measurements = d.measurements || [];
+  var tasks = d.tasks || [];
+  var reports = d.reportingPeriods || [];
+
+  // індекс замірів за indicator_id (останній за ts = поточне значення)
+  var measByInd = {};
+  measurements.forEach(function (m) {
+    var k = String(m.indicator_id);
+    if (!measByInd[k]) measByInd[k] = [];
+    measByInd[k].push(m);
+  });
+  Object.keys(measByInd).forEach(function (k) {
+    measByInd[k].sort(function (a, b) { return new Date(a.ts) - new Date(b.ts); });
+  });
+
+  // індикатори за parent_id (вузол логфрейму)
+  var indByParent = {};
+  indicators.forEach(function (i) {
+    var k = String(i.parent_id);
+    if (!indByParent[k]) indByParent[k] = [];
+    indByParent[k].push(i);
+  });
+
+  // задачі за activity_id
+  var tasksByAct = {};
+  tasks.forEach(function (t) {
+    var k = String(t.activity_id);
+    if (!tasksByAct[k]) tasksByAct[k] = [];
+    tasksByAct[k].push(t);
+  });
+
+  // ── картки стану ──
+  var today = new Date(); today.setHours(0,0,0,0);
+  var openTasks = tasks.filter(function (t) { return String(t.status).toLowerCase() !== "done"; });
+  var overdueTasks = openTasks.filter(function (t) {
+    if (isTrue(t.conditional)) return false;
+    var du = daysUntil(t.due_date); return du !== null && du < 0;
+  });
+  var openReports = reports.filter(function (r) { return String(r.status).toLowerCase() !== "submitted"; });
+  var overdueReports = openReports.filter(function (r) { var du = daysUntil(r.due_date); return du !== null && du < 0; });
+
+  // свіжість: індикатори, чий останній замір старший за STALE_DAYS (або взагалі без замірів)
+  var staleInds = indicators.filter(function (i) {
+    var ms = measByInd[String(i.id)];
+    if (!ms || !ms.length) return true;
+    var ds = daysSince(ms[ms.length - 1].ts);
+    return ds !== null && ds > STALE_DAYS;
+  });
+
+  document.getElementById("counts").innerHTML =
+    card(overdueTasks.length, "Прострочені задачі", overdueTasks.length ? "danger" : "ok") +
+    card(openTasks.length, "Відкриті задачі", "") +
+    card(overdueReports.length, "Прострочені звіти", overdueReports.length ? "danger" : "ok") +
+    card(indicators.length, "Індикаторів", "");
+
+  // ── тривога несвіжості ──
+  var sa = document.getElementById("staleAlert");
+  if (staleInds.length) {
+    sa.innerHTML = '<div class="stale-alert">⏳ <span><b>' + staleInds.length + '</b> ' +
+      plural(staleInds.length, "індикатор не оновлювався", "індикатори не оновлювались", "індикаторів не оновлювались") +
+      ' понад ' + STALE_DAYS + ' днів. Дані ризикують застаріти.</span></div>';
+  } else {
+    sa.innerHTML = '<div class="stale-alert clean">✓ Усі індикатори оновлені впродовж останніх ' + STALE_DAYS + ' днів.</div>';
+  }
+
+  // ── дедлайни звітів (дві колонки) ──
+  renderReports("repFin", reports.filter(function (r) { return r.kind === "financial"; }));
+  renderReports("repNarr", reports.filter(function (r) { return r.kind === "narrative"; }));
+
+  // ── Logframe-дерево ──
+  // будуємо мапу parent_id -> [діти], сортуємо за display_order
+  var byParent = {};
+  logframe.forEach(function (n) {
+    var k = n.parent_id ? String(n.parent_id) : "__root__";
+    if (!byParent[k]) byParent[k] = [];
+    byParent[k].push(n);
+  });
+  Object.keys(byParent).forEach(function (k) {
+    byParent[k].sort(function (a, b) { return (Number(a.display_order) || 0) - (Number(b.display_order) || 0); });
+  });
+
+  var ctx = { byParent: byParent, indByParent: indByParent, tasksByAct: tasksByAct, measByInd: measByInd, project: p };
+  var roots = byParent["__root__"] || [];
+  var html = roots.map(function (n) { return renderNode(n, ctx, 0); }).join("");
+  document.getElementById("tree").innerHTML = html || '<div class="empty state">Logframe порожній.</div>';
+  bindTree();
+}
+
+function card(n, label, cls) {
+  return '<div class="count ' + cls + '"><div class="n">' + n + '</div><div class="l">' + label + '</div></div>';
+}
+function plural(n, one, few, many) {
+  var m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+  return many;
+}
+
+function renderReports(elId, list) {
+  var el = document.getElementById(elId);
+  if (!list.length) { el.innerHTML = '<div class="rep-row"><div class="lbl"><div class="t" style="color:var(--ink-faint)">Немає періодів.</div></div></div>'; return; }
+  list.sort(function (a, b) { return new Date(a.due_date) - new Date(b.due_date); });
+  el.innerHTML = list.map(function (r) {
+    var done = String(r.status).toLowerCase() === "submitted";
+    var du = daysUntil(r.due_date);
+    var cls = done ? "done" : (du !== null && du < 0) ? "overdue" : (du !== null && du <= 14) ? "soon" : "";
+    var when = done ? "подано " + fmtDate(r.submitted_date)
+      : du === null ? "—"
+      : du < 0 ? "прострочено " + Math.abs(du) + " дн."
+      : du === 0 ? "сьогодні"
+      : "за " + du + " дн.";
+    return '<div class="rep-row ' + cls + '"><div class="lbl"><div class="t">' + esc(r.period_label) + '</div></div>' +
+      '<div class="when">' + when + '<br><span style="color:var(--ink-faint)">' + fmtDate(r.due_date) + '</span></div></div>';
+  }).join("");
+}
+
+function renderNode(n, ctx, depth) {
+  var id = String(n.id);
+  var code = String(n.code);
+  var lvl = String(n.level);
+  var children = ctx.byParent[id] || [];
+  var inds = ctx.indByParent[id] || [];
+  var acts = (lvl === "activity") ? (ctx.tasksByAct[id] || []) : [];
+  var hasKids = children.length || inds.length || acts.length;
+  var isCond = isTrue(n.conditional);
+  var open = expanded[code] !== undefined ? expanded[code] : (lvl === "impact" || lvl === "outcome");
+
+  // overdue для активності: якщо end_month/end_date минув, не done, не умовна
+  var actExtra = "";
+  if (lvl === "activity") {
+    var rng = "";
+    if (n.start_month && n.end_month) rng = "міс. " + esc(n.start_month) + "–" + esc(n.end_month);
+    if (n.start_date || n.end_date) rng = fmtDate(n.start_date) + " – " + fmtDate(n.end_date);
+    var endRef = n.end_date ? new Date(n.end_date) : (n.end_month ? monthToDate(ctx.project.start_date, Number(n.end_month)) : null);
+    var ovd = !isCond && endRef && !isNaN(endRef) && endRef < new Date() && String(n.status).toLowerCase() !== "done";
+    if (rng) actExtra = '<span class="act-dates' + (ovd ? ' act-overdue' : '') + '">' + rng + (ovd ? ' · прострочено' : '') + '</span>';
+  }
+
+  var head =
+    '<div class="node-head" data-code="' + esc(code) + '">' +
+      '<span class="tw">' + (hasKids ? (open ? '▾' : '▸') : '') + '</span>' +
+      '<span class="code">' + esc(code) + '</span>' +
+      '<span class="ttl">' + esc(n.title) + actExtra +
+        (isCond ? '<span class="cond-tag">умовна</span>' : '') + '</span>' +
+      '<span class="lvl ' + lvl + '">' + lvlLabel(lvl) + '</span>' +
+    '</div>';
+
+  var inner = "";
+  if (open) {
+    if (inds.length) inner += renderIndicators(inds, ctx);
+    if (acts.length) inner += renderTasks(acts, ctx.project);
+    if (children.length) inner += '<div class="node-children">' + children.map(function (c) { return renderNode(c, ctx, depth + 1); }).join("") + '</div>';
+  }
+
+  return '<div class="node' + (isCond ? ' cond' : '') + '">' + head + inner + '</div>';
+}
+
+function lvlLabel(l) { return { impact: "impact", outcome: "outcome", output: "output", activity: "activity" }[l] || l; }
+
+function renderIndicators(inds, ctx) {
+  var rows = inds.map(function (i) {
+    var ms = ctx.measByInd[String(i.id)] || [];
+    var current = ms.length ? Number(ms[ms.length - 1].value) : (i.baseline != null ? Number(i.baseline) : 0);
+    var target = Number(i.target) || 0;
+    var pct = target > 0 ? Math.round((current / target) * 100) : 0;
+    var barCls = pct >= 80 ? "green" : pct >= 50 ? "blue" : "red";
+    var lastTs = ms.length ? ms[ms.length - 1].ts : null;
+    var ds = daysSince(lastTs);
+    var stale = (ds === null) || ds > STALE_DAYS;
+    var freshTxt = (lastTs == null) ? "немає замірів"
+      : ds === 0 ? "оновлено сьогодні"
+      : "оновлено " + ds + " " + plural(ds, "день тому", "дні тому", "днів тому");
+    return '<div class="ind' + (stale ? ' stale-node' : '') + '">' +
+        '<div class="ihead"><span class="iname">' + esc(i.name) + '</span>' +
+        '<span class="ivals">' + esc(current) + ' / ' + esc(target) + ' ' + esc(i.unit || "") +
+          (i.target_year ? ' · ' + esc(i.target_year) : '') + '</span></div>' +
+        '<div class="bar ' + barCls + '"><span style="width:' + Math.min(100, Math.max(2, pct)) + '%"></span></div>' +
+        '<div class="ifoot"><span>' + pct + '%</span>' +
+          '<span class="' + (stale ? 'fresh-stale' : '') + '">' + (stale ? '⏳ ' : '') + freshTxt + '</span></div>' +
+      '</div>';
+  }).join("");
+  return '<div class="ind-block">' + rows + '</div>';
+}
+
+function renderTasks(tasks, project) {
+  tasks.sort(function (a, b) { return new Date(a.due_date) - new Date(b.due_date); });
+  var rows = tasks.map(function (t) {
+    var done = String(t.status).toLowerCase() === "done";
+    var du = daysUntil(t.due_date);
+    var ovd = !done && !isTrue(t.conditional) && du !== null && du < 0;
+    var who = String(t.owner_email || "").split("@")[0];
+    var ts = daysSince(t.ts);
+    var stale = !done && ts !== null && ts > STALE_DAYS;
+    return '<div class="task ' + (done ? 'done' : '') + (ovd ? ' overdue' : '') + (stale ? ' stale-node' : '') + '">' +
+        '<span class="box"></span>' +
+        '<span class="tt">' + esc(t.title) + '</span>' +
+        '<span class="who">' + esc(who) + '</span>' +
+        '<span class="td">' + (ovd ? "прострочено " + Math.abs(du) + " дн." : fmtDate(t.due_date)) + '</span>' +
+      '</div>';
+  }).join("");
+  return '<div class="task-block">' + rows + '</div>';
+}
+
+function bindTree() {
+  document.querySelectorAll(".node-head").forEach(function (h) {
+    h.addEventListener("click", function () {
+      var code = h.getAttribute("data-code");
+      var tw = h.querySelector(".tw").textContent.trim();
+      if (!tw) return; // лист без дітей — нічого не розгортати
+      expanded[code] = (tw === '▸'); // ▸ закрито → відкриваємо; ▾ відкрито → закриваємо
+      if (_lastData) renderProject(_lastData); // перерендер зі збереженим станом
+    });
+  });
+}
+
+// ── старт ──
+window.addEventListener("load", function () {
+  initGoogle();
+  var saved = localStorage.getItem("cplr_pp_token");
+  if (saved) {
+    var info = decodeJwt(saved);
+    if (info && info.exp && info.exp * 1000 > Date.now()) {
+      authToken = saved;
+      if (info.email) document.getElementById("meEmail").textContent = info.email;
+      boot();
+    } else { localStorage.removeItem("cplr_pp_token"); show("screenLogin"); }
+  } else { show("screenLogin"); }
+});
+</script>
+</body>
+</html>
