@@ -134,6 +134,27 @@
   /* інтерактив: заміри */
   .add-meas { font: inherit; font-size: 11px; padding: 2px 9px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--accent); cursor: pointer; white-space: nowrap; }
   .add-meas:hover { background: var(--brand-soft); border-color: var(--accent); }
+
+  /* інтерактив: задачі (редагування/додавання) */
+  .task .edit-task { font: inherit; font-size: 13px; line-height: 1; padding: 2px 6px; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--ink-faint); cursor: pointer; flex-shrink: 0; }
+  .task .edit-task:hover { background: var(--brand-soft); color: var(--brand); border-color: var(--line); }
+  .manual-tag { font-size: 10px; color: var(--accent); background: #e7f0fb; border-radius: 4px; padding: 1px 5px; margin-left: 4px; }
+  .task-empty { font-size: 12.5px; color: var(--ink-faint); padding: 4px 0 8px; }
+  .add-task { font: inherit; font-size: 12px; padding: 4px 12px; border: 1px dashed var(--line); border-radius: 7px; background: #fff; color: var(--accent); cursor: pointer; margin-top: 4px; }
+  .add-task:hover { background: var(--brand-soft); border-color: var(--accent); }
+  .task-form { margin: 8px 0 4px; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+  .task-form .tf-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .task-form input, .task-form select { font: inherit; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .task-form .tf-title { flex: 1; min-width: 180px; } .task-form .tf-due { width: 150px; }
+  .task-form .tf-owner, .task-form .tf-parts { flex: 1; min-width: 160px; }
+  .task-form .tf-vis { flex: 1; min-width: 200px; } .task-form .tf-deps { flex: 1; min-width: 160px; }
+  .task-form .tf-cond { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-soft); margin-bottom: 10px; cursor: pointer; }
+  .task-form .tf-cond-box { width: auto; }
+  .task-form .tf-actions { display: flex; gap: 8px; }
+  .task-form .tf-save { font: inherit; font-size: 12.5px; padding: 6px 14px; border: none; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+  .task-form .tf-save:disabled { opacity: .5; cursor: default; }
+  .task-form .tf-cancel { font: inherit; font-size: 12.5px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink-soft); cursor: pointer; }
+
   .meas-form { margin-top: 8px; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); }
   .meas-form .mf-row { display: flex; gap: 8px; flex-wrap: wrap; }
   .meas-form input { font: inherit; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
@@ -506,7 +527,7 @@ function renderNode(n, ctx, depth) {
   var children = ctx.byParent[id] || [];
   var inds = ctx.indByParent[id] || [];
   var acts = (lvl === "activity") ? (ctx.tasksByAct[id] || []) : [];
-  var hasKids = children.length || inds.length || acts.length;
+  var hasKids = children.length || inds.length || acts.length || lvl === "activity";
   var isCond = isTrue(n.conditional);
   var open = expanded[code] !== undefined ? expanded[code] : (lvl === "impact" || lvl === "outcome");
 
@@ -533,7 +554,7 @@ function renderNode(n, ctx, depth) {
   var inner = "";
   if (open) {
     if (inds.length) inner += renderIndicators(inds, ctx);
-    if (acts.length) inner += renderTasks(acts, ctx);
+    if (lvl === "activity") inner += renderTasks(acts, ctx, n);
     if (children.length) inner += '<div class="node-children">' + children.map(function (c) { return renderNode(c, ctx, depth + 1); }).join("") + '</div>';
   }
 
@@ -575,7 +596,7 @@ function renderIndicators(inds, ctx) {
   return '<div class="ind-block">' + rows + '</div>';
 }
 
-function renderTasks(tasks, ctx) {
+function renderTasks(tasks, ctx, actNode) {
   tasks.sort(function (a, b) { return new Date(a.due_date) - new Date(b.due_date); });
   var rows = tasks.map(function (t) {
     var done = String(t.status).toLowerCase() === "done";
@@ -585,20 +606,30 @@ function renderTasks(tasks, ctx) {
     var ts = daysSince(t.ts);
     var stale = !done && ts !== null && ts > STALE_DAYS;
     // право міняти статус (для показу): учасник АБО owner АБО lead. Реальна перевірка — на бекенді.
-    var canEdit = ctx.myRole === "lead" ||
-                  emailInList(ctx.myEmail, t.participants) ||
-                  String(t.owner_email || "").toLowerCase().trim() === ctx.myEmail;
+    var amParticipant = emailInList(ctx.myEmail, t.participants) ||
+                        String(t.owner_email || "").toLowerCase().trim() === ctx.myEmail;
+    var canEdit = ctx.myRole === "lead" || amParticipant;
     var nextStatus = done ? "pending" : "done";
     return '<div class="task ' + (done ? 'done' : '') + (ovd ? ' overdue' : '') + (stale ? ' stale-node' : '') + '">' +
         '<span class="box' + (canEdit ? ' editable' : '') + '"' +
           (canEdit ? ' data-task="' + esc(t.id) + '" data-next="' + nextStatus + '" title="' + (done ? 'Відкрити задачу' : 'Позначити виконаною') + '"' : ' title="лише учасники можуть змінювати"') +
         '></span>' +
-        '<span class="tt">' + esc(t.title) + '</span>' +
+        '<span class="tt">' + esc(t.title) + (isTrue(t.manual_add) ? ' <span class="manual-tag">додано</span>' : '') + '</span>' +
         '<span class="who">' + esc(who) + '</span>' +
         '<span class="td">' + (ovd ? "прострочено " + Math.abs(du) + " дн." : fmtDate(t.due_date)) + '</span>' +
-      '</div>';
+        (canEdit ? '<button class="edit-task" data-task="' + esc(t.id) + '" title="Редагувати">✎</button>' : '<span style="width:14px"></span>') +
+      '</div>' +
+      '<div class="task-form hidden" data-form="task:' + esc(t.id) + '"></div>';
   }).join("");
-  return '<div class="task-block">' + rows + '</div>';
+
+  // право додати задачу: lead будь-куди, member — у своєму проєкті (manual_add). Захист на бекенді.
+  var canAdd = ctx.myRole === "lead" || ctx.myRole === "member" || ctx.myRole === "finance";
+  var addBtn = canAdd
+    ? '<button class="add-task" data-act="' + esc(actNode.id) + '">+ задача</button>' +
+      '<div class="task-form hidden" data-form="new:' + esc(actNode.id) + '"></div>'
+    : '';
+
+  return '<div class="task-block">' + (rows || '<div class="task-empty">Немає задач під цією активністю.</div>') + addBtn + '</div>';
 }
 
 // допоміжне для UI (дзеркало бекенду; справжній захист — на сервері)
@@ -666,6 +697,42 @@ function bindTree() {
       if (f) { f.classList.add("hidden"); f.innerHTML = ""; }
       return;
     }
+
+    // 5) додати задачу під активність
+    var addTaskBtn = t.closest(".add-task");
+    if (addTaskBtn) {
+      var actId = addTaskBtn.getAttribute("data-act");
+      var nf = tree.querySelector('.task-form[data-form="new:' + cssEsc(actId) + '"]');
+      if (!nf) return;
+      if (!nf.classList.contains("hidden")) { nf.classList.add("hidden"); nf.innerHTML = ""; return; }
+      nf.innerHTML = taskFormHtml({ mode: "new", actId: actId });
+      nf.classList.remove("hidden");
+      var ti = nf.querySelector(".tf-title"); if (ti) ti.focus();
+      return;
+    }
+
+    // 6) редагувати наявну задачу
+    var editTaskBtn = t.closest(".edit-task");
+    if (editTaskBtn) {
+      var etId = editTaskBtn.getAttribute("data-task");
+      var ef = tree.querySelector('.task-form[data-form="task:' + cssEsc(etId) + '"]');
+      if (!ef) return;
+      if (!ef.classList.contains("hidden")) { ef.classList.add("hidden"); ef.innerHTML = ""; return; }
+      var task = (_lastData.tasks || []).filter(function (x) { return String(x.id) === etId; })[0];
+      ef.innerHTML = taskFormHtml({ mode: "edit", task: task });
+      ef.classList.remove("hidden");
+      return;
+    }
+
+    // 7) зберегти / скасувати форму задачі
+    var tsave = t.closest(".tf-save");
+    if (tsave) { submitTask(tsave.getAttribute("data-mode"), tsave.getAttribute("data-key")); return; }
+    var tcancel = t.closest(".tf-cancel");
+    if (tcancel) {
+      var tf = tree.querySelector('.task-form[data-form="' + cssEsc(tcancel.getAttribute("data-key")) + '"]');
+      if (tf) { tf.classList.add("hidden"); tf.innerHTML = ""; }
+      return;
+    }
   });
 }
 
@@ -686,6 +753,69 @@ function measFormHtml(indId, unit) {
       '<button class="m-save" data-ind="' + esc(indId) + '">Зберегти</button>' +
       '<button class="m-cancel" data-ind="' + esc(indId) + '">Скасувати</button>' +
     '</div>';
+}
+
+// форма задачі — для нової (mode:new, actId) і редагування (mode:edit, task)
+function taskFormHtml(opts) {
+  var isLead = myRole === "lead";
+  var t = opts.mode === "edit" ? (opts.task || {}) : {};
+  var key = opts.mode === "edit" ? ("task:" + opts.task.id) : ("new:" + opts.actId);
+  var vis = String(t.visible_to || "participants+coord");
+
+  var leadFields = isLead
+    ? '<div class="tf-row">' +
+        '<input class="tf-owner" type="text" value="' + esc(t.owner_email || "") + '" placeholder="owner (email)">' +
+        '<input class="tf-parts" type="text" value="' + esc(t.participants || "") + '" placeholder="учасники (a@x;b@x)">' +
+      '</div>'
+    : '';
+
+  return '<div class="tf-row">' +
+      '<input class="tf-title" type="text" value="' + esc(t.title || "") + '" placeholder="назва задачі">' +
+      '<input class="tf-due" type="date" value="' + esc(t.due_date ? String(t.due_date).slice(0,10) : "") + '">' +
+    '</div>' +
+    leadFields +
+    '<div class="tf-row">' +
+      '<select class="tf-vis">' +
+        '<option value="participants+coord"' + (vis==="participants+coord"?" selected":"") + '>видно: учасники + координатор</option>' +
+        '<option value="project"' + (vis==="project"?" selected":"") + '>видно: весь проєкт</option>' +
+      '</select>' +
+      '<input class="tf-deps" type="text" value="' + esc(t.deps || "") + '" placeholder="залежить від (T001;T003)">' +
+    '</div>' +
+    '<label class="tf-cond"><input class="tf-cond-box" type="checkbox"' + (isTrue(t.conditional)?" checked":"") + '> умовна (if introduced / upon request)</label>' +
+    '<div class="tf-actions">' +
+      '<button class="tf-save" data-mode="' + esc(opts.mode) + '" data-key="' + esc(key) + '"' +
+        (opts.mode==="new" ? ' data-act="' + esc(opts.actId) + '"' : ' data-task="' + esc(opts.task.id) + '"') + '>' +
+        (opts.mode==="new" ? "Створити" : "Зберегти") + '</button>' +
+      '<button class="tf-cancel" data-key="' + esc(key) + '">Скасувати</button>' +
+    '</div>';
+}
+
+function submitTask(mode, key) {
+  var tree = document.getElementById("tree");
+  var form = tree.querySelector('.task-form[data-form="' + cssEsc(key) + '"]');
+  if (!form) return;
+  var title = form.querySelector(".tf-title").value.trim();
+  if (!title) { toast("Вкажіть назву задачі", "err"); return; }
+  var due = form.querySelector(".tf-due").value; // "" або YYYY-MM-DD
+  var vis = form.querySelector(".tf-vis").value;
+  var deps = form.querySelector(".tf-deps").value.trim();
+  var cond = form.querySelector(".tf-cond-box").checked;
+  var payload = { title: title, due_date: due, visible_to: vis, deps: deps, conditional: cond };
+
+  var ownerEl = form.querySelector(".tf-owner");
+  if (ownerEl) { payload.owner_email = ownerEl.value.trim(); }
+  var partsEl = form.querySelector(".tf-parts");
+  if (partsEl) { payload.participants = partsEl.value.trim(); }
+
+  var saveBtn = form.querySelector(".tf-save");
+  if (mode === "new") { payload.activityId = saveBtn.getAttribute("data-act"); }
+  else { payload.taskId = saveBtn.getAttribute("data-task"); }
+
+  saveBtn.disabled = true; saveBtn.textContent = "…";
+  apiPost("upsertTask", payload).then(function (res) {
+    if (res && res.ok) { toast(res.created ? "Задачу створено" : "Задачу оновлено", "ok"); reloadCurrent(); }
+    else { toast(errMsg(res), "err"); saveBtn.disabled = false; saveBtn.textContent = (mode === "new" ? "Створити" : "Зберегти"); }
+  });
 }
 
 function submitMeasurement(indId) {
@@ -715,6 +845,9 @@ function errMsg(res) {
     NOT_FOUND: "Запис не знайдено",
     BAD_STATUS: "Недопустимий статус",
     BAD_VALUE: "Значення має бути числом",
+    BAD_DATE: "Дата має бути у форматі рррр-мм-дд",
+    BAD_PARENT: "Задачі чіпляються лише до активності",
+    FORBIDDEN_FIELD: "Зміну owner/учасників робить координатор",
     BAD_REQUEST: "Некоректний запит"
   };
   if (res.error === "AUTH_REQUIRED") { logout(); }
