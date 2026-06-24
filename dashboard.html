@@ -105,7 +105,9 @@
   .bar { height: 7px; background: var(--line-soft); border-radius: 4px; margin-top: 6px; overflow: hidden; }
   .bar > span { display: block; height: 100%; border-radius: 4px; }
   .bar.green > span { background: var(--ok); } .bar.blue > span { background: var(--accent); } .bar.red > span { background: var(--danger); }
-  .ifoot { display: flex; justify-content: space-between; margin-top: 5px; font-size: 11px; color: var(--ink-faint); }
+  .ifoot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 5px; font-size: 11px; color: var(--ink-faint); }
+  .ifoot-right { display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
+  .pct-done { color: var(--ok); font-weight: 600; }
   .fresh-dot { display: inline-block; }
   .fresh-stale { color: var(--warn); font-weight: 600; }
 
@@ -569,7 +571,9 @@ function renderIndicators(inds, ctx) {
     var current = ms.length ? Number(ms[ms.length - 1].value) : (i.baseline != null ? Number(i.baseline) : 0);
     var target = Number(i.target) || 0;
     var pct = target > 0 ? Math.round((current / target) * 100) : 0;
-    var barCls = pct >= 80 ? "green" : pct >= 50 ? "blue" : "red";
+    var reached = pct >= 100;
+    var pctShown = reached ? "ціль досягнута" + (pct > 100 ? " (" + pct + "%)" : "") : pct + "%";
+    var barCls = reached ? "green" : pct >= 80 ? "green" : pct >= 50 ? "blue" : "red";
     var lastTs = ms.length ? ms[ms.length - 1].ts : null;
     var ds = daysSince(lastTs);
     var stale = (ds === null) || ds > STALE_DAYS;
@@ -584,8 +588,8 @@ function renderIndicators(inds, ctx) {
         '<span class="ivals">' + esc(current) + ' / ' + esc(target) + ' ' + esc(i.unit || "") +
           (i.target_year ? ' · ' + esc(i.target_year) : '') + '</span></div>' +
         '<div class="bar ' + barCls + '"><span style="width:' + Math.min(100, Math.max(2, pct)) + '%"></span></div>' +
-        '<div class="ifoot"><span>' + pct + '%</span>' +
-          '<span style="display:flex;gap:10px;align-items:center">' +
+        '<div class="ifoot"><span' + (reached ? ' class="pct-done"' : '') + '>' + pctShown + '</span>' +
+          '<span class="ifoot-right">' +
             '<span class="' + (stale ? 'fresh-stale' : '') + '">' + (stale ? '⏳ ' : '') + freshTxt + '</span>' +
             (canMeasure ? '<button class="add-meas" data-ind="' + esc(i.id) + '" data-unit="' + esc(i.unit || "") + '">+ замір</button>' : '') +
           '</span>' +
