@@ -71,6 +71,14 @@
   .rep-row.soon .when { color: var(--warn); font-weight: 600; }
   .rep-row.done .lbl .t { color: var(--ink-faint); text-decoration: line-through; }
   .rep-row.done .when { color: var(--ok); }
+  .rep-row .rep-act { flex-shrink: 0; display: flex; align-items: center; }
+  .rep-toggle { font: inherit; font-size: 11px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ok); cursor: pointer; white-space: nowrap; }
+  .rep-toggle:hover { background: var(--ok-bg); border-color: var(--ok); }
+  .rep-toggle:disabled { opacity: .5; cursor: default; }
+  .rep-gen { padding: 8px 13px; border-top: 1px solid var(--line-soft); }
+  .gen-dates { font: inherit; font-size: 11.5px; padding: 5px 11px; border: 1px dashed var(--line); border-radius: 7px; background: #fff; color: var(--accent); cursor: pointer; width: 100%; }
+  .gen-dates:hover { background: var(--brand-soft); border-color: var(--accent); }
+  .gen-dates:disabled { opacity: .5; cursor: default; }
 
   /* секція */
   .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint); margin: 0 2px 12px; }
@@ -471,8 +479,9 @@ function renderProject(d) {
   }
 
   // ── дедлайни звітів (дві колонки) ──
-  renderReports("repFin", reports.filter(function (r) { return r.kind === "financial"; }));
-  renderReports("repNarr", reports.filter(function (r) { return r.kind === "narrative"; }));
+  var isLeadView = myRole === "lead";
+  renderReports("repFin", reports.filter(function (r) { return r.kind === "financial"; }), "financial", isLeadView, p.id);
+  renderReports("repNarr", reports.filter(function (r) { return r.kind === "narrative"; }), "narrative", isLeadView, p.id);
 
   // ── Logframe-дерево ──
   // будуємо мапу parent_id -> [діти], сортуємо за display_order
@@ -492,6 +501,7 @@ function renderProject(d) {
   var html = roots.map(function (n) { return renderNode(n, ctx, 0); }).join("");
   document.getElementById("tree").innerHTML = html || '<div class="empty state">Logframe порожній.</div>';
   bindTree();
+  bindReports();
 }
 
 function card(n, label, cls) {
@@ -504,11 +514,11 @@ function plural(n, one, few, many) {
   return many;
 }
 
-function renderReports(elId, list) {
+function renderReports(elId, list, kind, isLead, projectId) {
   var el = document.getElementById(elId);
-  if (!list.length) { el.innerHTML = '<div class="rep-row"><div class="lbl"><div class="t" style="color:var(--ink-faint)">Немає періодів.</div></div></div>'; return; }
   list.sort(function (a, b) { return new Date(a.due_date) - new Date(b.due_date); });
-  el.innerHTML = list.map(function (r) {
+
+  var rowsHtml = list.length ? list.map(function (r) {
     var done = String(r.status).toLowerCase() === "submitted";
     var du = daysUntil(r.due_date);
     var cls = done ? "done" : (du !== null && du < 0) ? "overdue" : (du !== null && du <= 14) ? "soon" : "";
@@ -517,9 +527,23 @@ function renderReports(elId, list) {
       : du < 0 ? "прострочено " + Math.abs(du) + " дн."
       : du === 0 ? "сьогодні"
       : "за " + du + " дн.";
-    return '<div class="rep-row ' + cls + '"><div class="lbl"><div class="t">' + esc(r.period_label) + '</div></div>' +
-      '<div class="when">' + when + '<br><span style="color:var(--ink-faint)">' + fmtDate(r.due_date) + '</span></div></div>';
-  }).join("");
+    var btn = isLead
+      ? '<button class="rep-toggle" data-period="' + esc(r.id) + '" data-submitted="' + (done ? "0" : "1") + '" title="' + (done ? "Повернути в очікування" : "Позначити поданим") + '">' + (done ? "↩" : "✓ подано") + '</button>'
+      : '';
+    return '<div class="rep-row ' + cls + '">' +
+        '<div class="lbl"><div class="t">' + esc(r.period_label) + '</div></div>' +
+        '<div class="when">' + when + '<br><span style="color:var(--ink-faint)">' + fmtDate(r.due_date) + '</span></div>' +
+        (btn ? '<div class="rep-act">' + btn + '</div>' : '') +
+      '</div>';
+  }).join("") : '<div class="rep-row"><div class="lbl"><div class="t" style="color:var(--ink-faint)">Немає періодів.</div></div></div>';
+
+  // кнопка генерації дат — лише координатору
+  var genBtn = isLead
+    ? '<div class="rep-gen"><button class="gen-dates" data-kind="' + esc(kind) + '" data-project="' + esc(projectId) + '">' +
+        (list.length ? "Догенерувати дати з періодичності" : "Сформувати дати з періодичності") + '</button></div>'
+    : '';
+
+  el.innerHTML = rowsHtml + genBtn;
 }
 
 function renderNode(n, ctx, depth) {
@@ -740,8 +764,46 @@ function bindTree() {
   });
 }
 
-function cssEsc(s) { return String(s).replace(/["\\]/g, "\\$&"); }
+var reportsBound = false;
+function bindReports() {
+  if (reportsBound) return;
+  reportsBound = true;
+  ["repFin", "repNarr"].forEach(function (cid) {
+    var cont = document.getElementById(cid);
+    if (!cont) return;
+    cont.addEventListener("click", function (ev) {
+      var t = ev.target;
+      // позначити поданим / повернути
+      var tog = t.closest(".rep-toggle");
+      if (tog) {
+        var periodId = tog.getAttribute("data-period");
+        var submitted = tog.getAttribute("data-submitted") === "1";
+        tog.disabled = true;
+        apiPost("setReportSubmitted", { periodId: periodId, submitted: submitted }).then(function (res) {
+          if (res && res.ok) { toast(submitted ? "Звіт позначено поданим" : "Звіт повернено в очікування", "ok"); reloadCurrent(); }
+          else { toast(errMsg(res), "err"); tog.disabled = false; }
+        });
+        return;
+      }
+      // згенерувати дати
+      var gen = t.closest(".gen-dates");
+      if (gen) {
+        var kind = gen.getAttribute("data-kind");
+        var projectId = gen.getAttribute("data-project");
+        var kindLbl = kind === "financial" ? "фінансових" : "змістовних";
+        if (!confirm("Сформувати чернетку " + kindLbl + " дедлайнів з періодичності проєкту?\n\nНаявні неподані дати цього типу будуть замінені. Подані звіти не чіпаються. Дати потім можна підправити вручну.")) return;
+        gen.disabled = true; gen.textContent = "…";
+        apiPost("generateReportDates", { projectId: projectId, kind: kind, replace: true }).then(function (res) {
+          if (res && res.ok) { toast("Сформовано дат: " + res.generated, "ok"); reloadCurrent(); }
+          else { toast(errMsg(res), "err"); gen.disabled = false; }
+        });
+        return;
+      }
+    });
+  });
+}
 
+function cssEsc(s) { return String(s).replace(/["\\]/g, "\\$&"); }
 function defaultPeriod() {
   var d = new Date();
   return d.getFullYear() + "-Q" + (Math.floor(d.getMonth() / 3) + 1);
@@ -852,6 +914,9 @@ function errMsg(res) {
     BAD_DATE: "Дата має бути у форматі рррр-мм-дд",
     BAD_PARENT: "Задачі чіпляються лише до активності",
     FORBIDDEN_FIELD: "Зміну owner/учасників робить координатор",
+    FORBIDDEN: "Дію виконує лише координатор",
+    BAD_FREQ: "У проєкті не задано періодичність звітів",
+    BAD_PROJECT: "У проєкті немає дат початку/кінця",
     BAD_REQUEST: "Некоректний запит"
   };
   if (res.error === "AUTH_REQUIRED") { logout(); }
