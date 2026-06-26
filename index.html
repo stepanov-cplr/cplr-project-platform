@@ -52,6 +52,13 @@
   a.row:hover { background: var(--bg); }
   .row .chev { flex-shrink: 0; color: var(--ink-faint); font-size: 16px; line-height: 1; margin-left: 2px; }
   a.row:hover .chev { color: var(--accent); }
+  /* мої (owner) vs допоміжні (учасник) */
+  a.row.support { opacity: 0.62; }
+  a.row.support:hover { opacity: 1; }
+  a.row.mine .title { font-weight: 600; }
+  .role-tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; margin-left: 4px; vertical-align: middle; }
+  .role-tag.owner { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+  .role-tag.part { background: var(--line-soft); color: var(--ink-soft); }
   .row .body { flex: 1; min-width: 0; }
   .row .title { font-size: 14.5px; }
   .row .meta { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
@@ -222,8 +229,12 @@ function render(d) {
     ? tasks.map(function (t) {
         var f = fmtDays(t.days);
         var href = t.project_id ? 'dashboard.html?project=' + encodeURIComponent(t.project_id) : '#';
-        return '<a class="row ' + f.cls + '" href="' + href + '"><div class="body"><div class="title">' + esc(t.title) +
-          '</div><div class="meta">' + esc(t.project) + (t.conditional ? ' · умовна' : '') +
+        var roleTag = t.is_owner
+          ? '<span class="role-tag owner">я відповідальний</span>'
+          : (t.owner_short ? '<span class="role-tag part">відповідальний: ' + esc(t.owner_short) + '</span>' : '');
+        var rowCls = (t.is_owner ? 'mine ' : 'support ') + f.cls;
+        return '<a class="row ' + rowCls + '" href="' + href + '"><div class="body"><div class="title">' + esc(t.title) +
+          '</div><div class="meta">' + esc(t.project) + (t.conditional ? ' · за потреби' : '') + ' ' + roleTag +
           '</div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + esc(t.due_date) + '</div></div><span class="chev">›</span></a>';
       }).join("")
     : '<div class="empty">Немає відкритих задач. Чисто.</div>';
