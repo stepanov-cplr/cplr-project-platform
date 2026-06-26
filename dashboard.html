@@ -79,6 +79,31 @@
   .gen-dates { font: inherit; font-size: 11.5px; padding: 5px 11px; border: 1px dashed var(--line); border-radius: 7px; background: #fff; color: var(--accent); cursor: pointer; width: 100%; }
   .gen-dates:hover { background: var(--brand-soft); border-color: var(--accent); }
   .gen-dates:disabled { opacity: .5; cursor: default; }
+  /* видалення задач/замірів */
+  .task .del-task { font: inherit; font-size: 12px; line-height: 1; padding: 2px 5px; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--ink-faint); cursor: pointer; flex-shrink: 0; }
+  .task .del-task:hover { background: var(--danger-bg); color: var(--danger); border-color: var(--line); }
+  .del-meas { font: inherit; font-size: 11px; line-height: 1; padding: 2px 5px; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--ink-faint); cursor: pointer; }
+  .del-meas:hover { background: var(--danger-bg); color: var(--danger); border-color: var(--line); }
+  /* залежності у формі задачі */
+  .tf-deps-wrap { margin-bottom: 10px; padding: 8px 10px; background: #fff; border: 1px solid var(--line); border-radius: 6px; }
+  .tf-deps-cap { font-size: 11.5px; color: var(--ink-soft); margin-bottom: 6px; }
+  .tf-dep { display: flex; align-items: flex-start; gap: 7px; font-size: 12.5px; color: var(--ink); padding: 3px 0; cursor: pointer; }
+  .tf-dep input { width: auto; margin-top: 2px; }
+  /* період звіту: дії + форма */
+  .rep-act { gap: 4px !important; }
+  .rep-edit, .rep-del { font: inherit; font-size: 12px; line-height: 1; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; color: var(--ink-soft); }
+  .rep-edit:hover { background: var(--brand-soft); color: var(--brand); border-color: var(--accent); }
+  .rep-del:hover { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+  .rep-add { font: inherit; font-size: 11.5px; padding: 5px 11px; border: 1px dashed var(--line); border-radius: 7px; background: #fff; color: var(--accent); cursor: pointer; margin-top: 6px; width: 100%; }
+  .rep-add:hover { background: var(--brand-soft); border-color: var(--accent); }
+  .rep-form { padding: 10px 13px; border-top: 1px solid var(--line-soft); background: var(--bg); }
+  .rep-form .rf-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .rep-form input { font: inherit; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .rep-form .rf-label { flex: 1; min-width: 160px; } .rep-form .rf-due { width: 150px; }
+  .rep-form .rf-actions { display: flex; gap: 8px; }
+  .rep-form .rep-save { font: inherit; font-size: 12.5px; padding: 6px 14px; border: none; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+  .rep-form .rep-save:disabled { opacity: .5; cursor: default; }
+  .rep-form .rep-cancel { font: inherit; font-size: 12.5px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink-soft); cursor: pointer; }
 
   /* секція */
   .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint); margin: 0 2px 12px; }
@@ -527,20 +552,29 @@ function renderReports(elId, list, kind, isLead, projectId) {
       : du < 0 ? "прострочено " + Math.abs(du) + " дн."
       : du === 0 ? "сьогодні"
       : "за " + du + " дн.";
-    var btn = isLead
-      ? '<button class="rep-toggle" data-period="' + esc(r.id) + '" data-submitted="' + (done ? "0" : "1") + '" title="' + (done ? "Повернути в очікування" : "Позначити поданим") + '">' + (done ? "↩" : "✓ подано") + '</button>'
+    var acts = isLead
+      ? '<div class="rep-act">' +
+          '<button class="rep-toggle" data-period="' + esc(r.id) + '" data-submitted="' + (done ? "0" : "1") + '" title="' + (done ? "Повернути в очікування" : "Позначити поданим") + '">' + (done ? "↩" : "✓ подано") + '</button>' +
+          '<button class="rep-edit" data-period="' + esc(r.id) + '" title="Редагувати дату/назву">✎</button>' +
+          '<button class="rep-del" data-period="' + esc(r.id) + '" data-label="' + esc(r.period_label) + '" title="Видалити період">🗑</button>' +
+        '</div>'
       : '';
     return '<div class="rep-row ' + cls + '">' +
         '<div class="lbl"><div class="t">' + esc(r.period_label) + '</div></div>' +
         '<div class="when">' + when + '<br><span style="color:var(--ink-faint)">' + fmtDate(r.due_date) + '</span></div>' +
-        (btn ? '<div class="rep-act">' + btn + '</div>' : '') +
-      '</div>';
+        acts +
+      '</div>' +
+      (isLead ? '<div class="rep-form hidden" data-rform="' + esc(r.id) + '"></div>' : '');
   }).join("") : '<div class="rep-row"><div class="lbl"><div class="t" style="color:var(--ink-faint)">Немає періодів.</div></div></div>';
 
-  // кнопка генерації дат — лише координатору
+  // кнопки координатора: догенерувати дати + додати один період вручну
   var genBtn = isLead
-    ? '<div class="rep-gen"><button class="gen-dates" data-kind="' + esc(kind) + '" data-project="' + esc(projectId) + '">' +
-        (list.length ? "Догенерувати дати з періодичності" : "Сформувати дати з періодичності") + '</button></div>'
+    ? '<div class="rep-gen">' +
+        '<button class="gen-dates" data-kind="' + esc(kind) + '" data-project="' + esc(projectId) + '">' +
+          (list.length ? "Догенерувати дати з періодичності" : "Сформувати дати з періодичності") + '</button>' +
+        '<button class="rep-add" data-kind="' + esc(kind) + '" data-project="' + esc(projectId) + '">+ один період вручну</button>' +
+        '<div class="rep-form hidden" data-rform="new:' + esc(kind) + '"></div>' +
+      '</div>'
     : '';
 
   el.innerHTML = rowsHtml + genBtn;
@@ -607,6 +641,7 @@ function renderIndicators(inds, ctx) {
     // право вносити замір (для показу): owner індикатора АБО lead. Захист — на бекенді.
     var canMeasure = ctx.myRole === "lead" ||
                      String(i.owner_email || "").toLowerCase().trim() === ctx.myEmail;
+    var lastMeasId = ms.length ? ms[ms.length - 1].id : null;
     return '<div class="ind' + (stale ? ' stale-node' : '') + '">' +
         '<div class="ihead"><span class="iname">' + esc(i.name) + '</span>' +
         '<span class="ivals">' + esc(current) + ' / ' + esc(target) + ' ' + esc(i.unit || "") +
@@ -615,6 +650,7 @@ function renderIndicators(inds, ctx) {
         '<div class="ifoot"><span' + (reached ? ' class="pct-done"' : '') + '>' + pctShown + '</span>' +
           '<span class="ifoot-right">' +
             '<span class="' + (stale ? 'fresh-stale' : '') + '">' + (stale ? '⏳ ' : '') + freshTxt + '</span>' +
+            (canMeasure && lastMeasId ? '<button class="del-meas" data-meas="' + esc(lastMeasId) + '" title="Видалити останній замір">🗑</button>' : '') +
             (canMeasure ? '<button class="add-meas" data-ind="' + esc(i.id) + '" data-unit="' + esc(i.unit || "") + '">+ замір</button>' : '') +
           '</span>' +
         '</div>' +
@@ -637,15 +673,19 @@ function renderTasks(tasks, ctx, actNode) {
     var amParticipant = emailInList(ctx.myEmail, t.participants) ||
                         String(t.owner_email || "").toLowerCase().trim() === ctx.myEmail;
     var canEdit = ctx.myRole === "lead" || amParticipant;
+    var canDelete = ctx.myRole === "lead" || amParticipant ||
+                    String(t.created_by || "").toLowerCase().trim() === ctx.myEmail;
     var nextStatus = done ? "pending" : "done";
     return '<div class="task ' + (done ? 'done' : '') + (ovd ? ' overdue' : '') + (stale ? ' stale-node' : '') + '">' +
         '<span class="box' + (canEdit ? ' editable' : '') + '"' +
           (canEdit ? ' data-task="' + esc(t.id) + '" data-next="' + nextStatus + '" title="' + (done ? 'Відкрити задачу' : 'Позначити виконаною') + '"' : ' title="лише учасники можуть змінювати"') +
         '></span>' +
-        '<span class="tt">' + esc(t.title) + (isTrue(t.manual_add) ? ' <span class="manual-tag">додано</span>' : '') + '</span>' +
+        '<span class="tt">' + esc(t.title) + (isTrue(t.manual_add) ? ' <span class="manual-tag">додано</span>' : '') +
+          (isTrue(t.conditional) ? ' <span class="manual-tag" style="background:var(--warn-bg);color:var(--warn)" title="Виконується лише за потреби; не червоніє як прострочена">за потреби</span>' : '') + '</span>' +
         '<span class="who">' + esc(who) + '</span>' +
         '<span class="td">' + (ovd ? "прострочено " + Math.abs(du) + " дн." : fmtDate(t.due_date)) + '</span>' +
         (canEdit ? '<button class="edit-task" data-task="' + esc(t.id) + '" title="Редагувати">✎</button>' : '<span style="width:14px"></span>') +
+        (canDelete ? '<button class="del-task" data-task="' + esc(t.id) + '" data-title="' + esc(t.title) + '" title="Видалити">🗑</button>' : '<span style="width:14px"></span>') +
       '</div>' +
       '<div class="task-form hidden" data-form="task:' + esc(t.id) + '"></div>';
   }).join("");
@@ -761,6 +801,33 @@ function bindTree() {
       if (tf) { tf.classList.add("hidden"); tf.innerHTML = ""; }
       return;
     }
+
+    // 8) видалити задачу
+    var delTaskBtn = t.closest(".del-task");
+    if (delTaskBtn) {
+      var dtId = delTaskBtn.getAttribute("data-task");
+      var dtTitle = delTaskBtn.getAttribute("data-title") || dtId;
+      if (!confirm('Видалити задачу «' + dtTitle + '»?\nЦю дію не можна скасувати.')) return;
+      delTaskBtn.disabled = true;
+      apiPost("deleteTask", { taskId: dtId }).then(function (res) {
+        if (res && res.ok) { toast("Задачу видалено", "ok"); reloadCurrent(); }
+        else { toast(errMsg(res), "err"); delTaskBtn.disabled = false; }
+      });
+      return;
+    }
+
+    // 9) видалити останній замір індикатора
+    var delMeasBtn = t.closest(".del-meas");
+    if (delMeasBtn) {
+      var dmId = delMeasBtn.getAttribute("data-meas");
+      if (!confirm('Видалити останній замір цього індикатора?\nЦю дію не можна скасувати.')) return;
+      delMeasBtn.disabled = true;
+      apiPost("deleteMeasurement", { measurementId: dmId }).then(function (res) {
+        if (res && res.ok) { toast("Замір видалено", "ok"); reloadCurrent(); }
+        else { toast(errMsg(res), "err"); delMeasBtn.disabled = false; }
+      });
+      return;
+    }
   });
 }
 
@@ -799,7 +866,91 @@ function bindReports() {
         });
         return;
       }
+      // редагувати період (дата/назва)
+      var redit = t.closest(".rep-edit");
+      if (redit) {
+        var pid = redit.getAttribute("data-period");
+        var rf = cont.querySelector('.rep-form[data-rform="' + cssEsc(pid) + '"]');
+        if (!rf) return;
+        if (!rf.classList.contains("hidden")) { rf.classList.add("hidden"); rf.innerHTML = ""; return; }
+        var period = (_lastData.reportingPeriods || []).filter(function (x) { return String(x.id) === pid; })[0] || {};
+        rf.innerHTML = repFormHtml({ mode: "edit", period: period });
+        rf.classList.remove("hidden");
+        return;
+      }
+      // видалити період
+      var rdel = t.closest(".rep-del");
+      if (rdel) {
+        var dpid = rdel.getAttribute("data-period");
+        var dlabel = rdel.getAttribute("data-label") || dpid;
+        if (!confirm('Видалити період звіту «' + dlabel + '»?\nЦю дію не можна скасувати.')) return;
+        rdel.disabled = true;
+        apiPost("deleteReportingPeriod", { periodId: dpid }).then(function (res) {
+          if (res && res.ok) { toast("Період видалено", "ok"); reloadCurrent(); }
+          else { toast(errMsg(res), "err"); rdel.disabled = false; }
+        });
+        return;
+      }
+      // додати один період вручну
+      var radd = t.closest(".rep-add");
+      if (radd) {
+        var akind = radd.getAttribute("data-kind");
+        var aproj = radd.getAttribute("data-project");
+        var nf = cont.querySelector('.rep-form[data-rform="new:' + cssEsc(akind) + '"]');
+        if (!nf) return;
+        if (!nf.classList.contains("hidden")) { nf.classList.add("hidden"); nf.innerHTML = ""; return; }
+        nf.innerHTML = repFormHtml({ mode: "new", kind: akind, projectId: aproj });
+        nf.classList.remove("hidden");
+        return;
+      }
+      // зберегти / скасувати форму періоду
+      var rsave = t.closest(".rep-save");
+      if (rsave) { submitReportPeriod(rsave.getAttribute("data-key")); return; }
+      var rcancel = t.closest(".rep-cancel");
+      if (rcancel) {
+        var cf = cont.querySelector('.rep-form[data-rform="' + cssEsc(rcancel.getAttribute("data-key")) + '"]');
+        if (cf) { cf.classList.add("hidden"); cf.innerHTML = ""; }
+        return;
+      }
     });
+  });
+}
+
+// форма періоду звіту (нова/редагування)
+function repFormHtml(opts) {
+  var p = opts.mode === "edit" ? (opts.period || {}) : {};
+  var key = opts.mode === "edit" ? p.id : ("new:" + opts.kind);
+  var due = p.due_date ? String(p.due_date).slice(0, 10) : "";
+  return '<div class="rf-row">' +
+      '<input class="rf-label" type="text" value="' + esc(p.period_label || "") + '" placeholder="назва періоду (напр. Фінансовий — лип 2026)">' +
+      '<input class="rf-due" type="date" value="' + esc(due) + '">' +
+    '</div>' +
+    '<div class="rf-actions">' +
+      '<button class="rep-save" data-key="' + esc(key) + '"' +
+        (opts.mode === "new" ? ' data-new="1" data-kind="' + esc(opts.kind) + '" data-project="' + esc(opts.projectId) + '"' : ' data-period="' + esc(p.id) + '"') + '>' +
+        (opts.mode === "new" ? "Додати" : "Зберегти") + '</button>' +
+      '<button class="rep-cancel" data-key="' + esc(key) + '">Скасувати</button>' +
+    '</div>';
+}
+
+function submitReportPeriod(key) {
+  var form = document.querySelector('.rep-form[data-rform="' + cssEsc(key) + '"]');
+  if (!form) return;
+  var label = form.querySelector(".rf-label").value.trim();
+  var due = form.querySelector(".rf-due").value;
+  if (!label) { toast("Вкажіть назву періоду", "err"); return; }
+  if (!due) { toast("Вкажіть дату", "err"); return; }
+  var btn = form.querySelector(".rep-save");
+  btn.disabled = true; btn.textContent = "…";
+  var payload;
+  if (btn.getAttribute("data-new") === "1") {
+    payload = { kind: btn.getAttribute("data-kind"), projectId: btn.getAttribute("data-project"), period_label: label, due_date: due };
+  } else {
+    payload = { periodId: btn.getAttribute("data-period"), period_label: label, due_date: due };
+  }
+  apiPost("upsertReportingPeriod", payload).then(function (res) {
+    if (res && res.ok) { toast(res.created ? "Період додано" : "Період оновлено", "ok"); reloadCurrent(); }
+    else { toast(errMsg(res), "err"); btn.disabled = false; btn.textContent = payload.periodId ? "Зберегти" : "Додати"; }
   });
 }
 
@@ -828,10 +979,30 @@ function taskFormHtml(opts) {
   var key = opts.mode === "edit" ? ("task:" + opts.task.id) : ("new:" + opts.actId);
   var vis = String(t.visible_to || "participants+coord");
 
+  // activity_id поточної задачі (для нової — actId, для редагування — з самої задачі)
+  var actId = opts.mode === "new" ? opts.actId : String(t.activity_id);
+  // задачі-сусіди під тією ж активністю (крім самої себе)
+  var siblings = (_lastData.tasks || []).filter(function (x) {
+    return String(x.activity_id) === String(actId) && String(x.id) !== String(t.id || "");
+  });
+  // які ID уже стоять у deps цієї задачі
+  var curDeps = String(t.deps || "").split(/[;,]/).map(function (s) { return s.trim(); }).filter(Boolean);
+
+  var depsBlock;
+  if (siblings.length) {
+    depsBlock = '<div class="tf-deps-wrap"><div class="tf-deps-cap">Спочатку треба виконати інші задачі цієї активності? Позначте їх:</div>' +
+      siblings.map(function (s) {
+        var on = curDeps.indexOf(String(s.id)) >= 0;
+        return '<label class="tf-dep"><input type="checkbox" class="tf-dep-box" value="' + esc(s.id) + '"' + (on ? " checked" : "") + '> ' + esc(s.title) + '</label>';
+      }).join("") + '</div>';
+  } else {
+    depsBlock = '<div class="tf-deps-wrap"><div class="tf-deps-cap" style="color:var(--ink-faint)">Інших задач під цією активністю ще нема — залежностей не буде.</div></div>';
+  }
+
   var leadFields = isLead
     ? '<div class="tf-row">' +
-        '<input class="tf-owner" type="text" value="' + esc(t.owner_email || "") + '" placeholder="owner (email)">' +
-        '<input class="tf-parts" type="text" value="' + esc(t.participants || "") + '" placeholder="учасники (a@x;b@x)">' +
+        '<input class="tf-owner" type="text" value="' + esc(t.owner_email || "") + '" placeholder="головний відповідальний (email)">' +
+        '<input class="tf-parts" type="text" value="' + esc(t.participants || "") + '" placeholder="учасники через ; (a@x;b@x)">' +
       '</div>'
     : '';
 
@@ -845,9 +1016,9 @@ function taskFormHtml(opts) {
         '<option value="participants+coord"' + (vis==="participants+coord"?" selected":"") + '>видно: учасники + координатор</option>' +
         '<option value="project"' + (vis==="project"?" selected":"") + '>видно: весь проєкт</option>' +
       '</select>' +
-      '<input class="tf-deps" type="text" value="' + esc(t.deps || "") + '" placeholder="залежить від (T001;T003)">' +
     '</div>' +
-    '<label class="tf-cond"><input class="tf-cond-box" type="checkbox"' + (isTrue(t.conditional)?" checked":"") + '> умовна (if introduced / upon request)</label>' +
+    depsBlock +
+    '<label class="tf-cond"><input class="tf-cond-box" type="checkbox"' + (isTrue(t.conditional)?" checked":"") + '> Необов’язкова — виконується лише за потреби (не вважається простроченою)</label>' +
     '<div class="tf-actions">' +
       '<button class="tf-save" data-mode="' + esc(opts.mode) + '" data-key="' + esc(key) + '"' +
         (opts.mode==="new" ? ' data-act="' + esc(opts.actId) + '"' : ' data-task="' + esc(opts.task.id) + '"') + '>' +
@@ -864,7 +1035,9 @@ function submitTask(mode, key) {
   if (!title) { toast("Вкажіть назву задачі", "err"); return; }
   var due = form.querySelector(".tf-due").value; // "" або YYYY-MM-DD
   var vis = form.querySelector(".tf-vis").value;
-  var deps = form.querySelector(".tf-deps").value.trim();
+  var depEls = form.querySelectorAll(".tf-dep-box");
+  var deps = Array.prototype.slice.call(depEls).filter(function (b) { return b.checked; })
+    .map(function (b) { return b.value; }).join(";");
   var cond = form.querySelector(".tf-cond-box").checked;
   var payload = { title: title, due_date: due, visible_to: vis, deps: deps, conditional: cond };
 
@@ -917,6 +1090,8 @@ function errMsg(res) {
     FORBIDDEN: "Дію виконує лише координатор",
     BAD_FREQ: "У проєкті не задано періодичність звітів",
     BAD_PROJECT: "У проєкті немає дат початку/кінця",
+    NOT_ALLOWED: "Недостатньо прав для цієї дії",
+    ALREADY_SUBMITTED: "Поданий звіт не можна видалити — спершу зніміть «подано»",
     BAD_REQUEST: "Некоректний запит"
   };
   if (res.error === "AUTH_REQUIRED") { logout(); }
