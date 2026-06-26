@@ -48,6 +48,10 @@
   .list { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-bottom: 28px; }
   .row { display: flex; align-items: center; gap: 14px; padding: 13px 16px; border-top: 1px solid var(--line-soft); }
   .row:first-child { border-top: none; }
+  a.row { text-decoration: none; color: inherit; cursor: pointer; transition: background .12s; }
+  a.row:hover { background: var(--bg); }
+  .row .chev { flex-shrink: 0; color: var(--ink-faint); font-size: 16px; line-height: 1; margin-left: 2px; }
+  a.row:hover .chev { color: var(--accent); }
   .row .body { flex: 1; min-width: 0; }
   .row .title { font-size: 14.5px; }
   .row .meta { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
@@ -118,6 +122,8 @@
     <div class="list" id="taskList"><div class="state">—</div></div>
     <div class="section-title">Дедлайни звітування <span class="cnt" id="repCnt"></span></div>
     <div class="list" id="repList"><div class="state">—</div></div>
+    <div class="section-title">Мої проєкти <span class="cnt" id="projCnt"></span></div>
+    <div class="list" id="projList"><div class="state">—</div></div>
   </div>
 </div>
 
@@ -215,9 +221,10 @@ function render(d) {
   document.getElementById("taskList").innerHTML = tasks.length
     ? tasks.map(function (t) {
         var f = fmtDays(t.days);
-        return '<div class="row ' + f.cls + '"><div class="body"><div class="title">' + esc(t.title) +
+        var href = t.project_id ? 'dashboard.html?project=' + encodeURIComponent(t.project_id) : '#';
+        return '<a class="row ' + f.cls + '" href="' + href + '"><div class="body"><div class="title">' + esc(t.title) +
           '</div><div class="meta">' + esc(t.project) + (t.conditional ? ' · умовна' : '') +
-          '</div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + esc(t.due_date) + '</div></div></div>';
+          '</div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + esc(t.due_date) + '</div></div><span class="chev">›</span></a>';
       }).join("")
     : '<div class="empty">Немає відкритих задач. Чисто.</div>';
 
@@ -227,11 +234,22 @@ function render(d) {
     ? reps.map(function (r) {
         var f = fmtDays(r.days);
         var kindLabel = r.kind === "financial" ? "фінансовий" : "змістовний";
-        return '<div class="row ' + f.cls + '"><div class="body"><div class="title">' + esc(r.label) +
+        var href = r.project_id ? 'dashboard.html?project=' + encodeURIComponent(r.project_id) : '#';
+        return '<a class="row ' + f.cls + '" href="' + href + '"><div class="body"><div class="title">' + esc(r.label) +
           '</div><div class="meta">' + esc(r.project) + ' · <span class="pill ' + esc(r.kind) + '">' + kindLabel +
-          '</span></div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + esc(r.due_date) + '</div></div></div>';
+          '</span></div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + esc(r.due_date) + '</div></div><span class="chev">›</span></a>';
       }).join("")
     : '<div class="empty">Немає найближчих звітів.</div>';
+
+  var projs = d.projects || [];
+  document.getElementById("projCnt").textContent = projs.length ? "(" + projs.length + ")" : "";
+  document.getElementById("projList").innerHTML = projs.length
+    ? projs.map(function (p) {
+        return '<a class="row normal" href="dashboard.html?project=' + encodeURIComponent(p.id) + '">' +
+          '<div class="body"><div class="title">' + esc(p.name) + '</div>' +
+          '<div class="meta">відкрити дашборд проєкту</div></div><span class="chev">›</span></a>';
+      }).join("")
+    : '<div class="empty">Ви ще не маєте доступу до проєктів.</div>';
 }
 
 window.addEventListener("load", function () {
