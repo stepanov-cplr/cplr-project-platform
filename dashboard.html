@@ -114,6 +114,8 @@
   .node:first-child { border-top: none; }
   .node-head { display: flex; align-items: flex-start; gap: 9px; padding: 10px 16px; cursor: pointer; }
   .node-head:hover { background: var(--bg); }
+  .deep-hl { animation: deepHl 2.6s ease-out; border-radius: 8px; }
+  @keyframes deepHl { 0%,40% { background: var(--brand-soft); box-shadow: 0 0 0 2px var(--accent) inset; } 100% { background: transparent; box-shadow: none; } }
   .node-head .tw { width: 16px; flex-shrink: 0; color: var(--ink-faint); font-size: 11px; text-align: center; padding-top: 3px; }
   .node-head .code { flex-shrink: 0; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 12.5px; color: var(--ink-soft); min-width: 34px; padding-top: 1px; }
   .node-head .ttl { flex: 1; min-width: 0; font-size: 14px; }
@@ -614,6 +616,91 @@ function renderProject(d) {
   document.getElementById("tree").innerHTML = html || '<div class="empty state">Logframe порожній.</div>';
   bindTree();
   bindReports();
+
+  // ── глибоке посилання: ?task=<id> або ?activity=<id> ──
+  // розгортаємо гілку предків, скролимо й підсвічуємо потрібний вузол
+  var deepTask = qparam("task");
+  var deepAct = qparam("activity");
+  if (deepTask || deepAct) {
+    focusDeepLink(deepTask, deepAct, logframe, tasks, d);
+  }
+}
+
+// мапа id → вузол Logframe
+function nodeById(logframe) {
+  var m = {}; logframe.forEach(function (n) { m[String(n.id)] = n; }); return m;
+}
+
+function focusDeepLink(taskId, activityId, logframe, tasks, d) {
+  var byId = nodeById(logframe);
+  // визначаємо активність-якір
+  var actId = activityId;
+  if (taskId && !actId) {
+    var t = (tasks || []).filter(function (x) { return String(x.id) === String(taskId); })[0];
+    if (t) actId = String(t.activity_id || "");
+  }
+  if (!actId || !byId[actId]) return;
+
+  // збираємо коди предків (від активності вгору) і розгортаємо їх
+  var node = byId[actId];
+  var guard = 0;
+  while (node && guard++ < 20) {
+    if (node.code) expanded[String(node.code)] = true;
+    node = node.parent_id ? byId[String(node.parent_id)] : null;
+  }
+  // перерендер дерева з розгорнутими гілками
+  if (_lastData) {
+    var d2 = _lastData;
+    // повторний рендер лише дерева — простіше перерендерити весь проєкт
+    renderProjectTreeOnly(d2);
+  }
+
+  // скрол + підсвітка
+  setTimeout(function () {
+    var rowEl = null;
+    if (taskId) {
+      rowEl = document.querySelector('#tree .task[data-task-row="' + cssEsc(taskId) + '"]');
+    }
+    if (!rowEl && actId && byId[actId]) {
+      // запасний варіант: підсвітити заголовок активності за її кодом
+      var actCode = String(byId[actId].code || "");
+      rowEl = document.querySelector('#tree .node-head[data-code="' + cssEsc(actCode) + '"]');
+    }
+    if (rowEl) {
+      rowEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      rowEl.classList.add("deep-hl");
+      setTimeout(function () { rowEl.classList.remove("deep-hl"); }, 2600);
+    }
+  }, 150);
+}
+
+// перерендер лише дерева (для глибокого посилання, без повторного рендеру карток/команди)
+function renderProjectTreeOnly(d) {
+  var logframe = d.logframe || [];
+  var tasks = d.tasks || [];
+  var indicators = d.indicators || [];
+  var measurements = d.measurements || [];
+  var p = d.project || {};
+  var byParent = {};
+  logframe.forEach(function (n) {
+    var k = n.parent_id ? String(n.parent_id) : "__root__";
+    (byParent[k] = byParent[k] || []).push(n);
+  });
+  Object.keys(byParent).forEach(function (k) {
+    byParent[k].sort(function (a, b) { return (Number(a.display_order) || 0) - (Number(b.display_order) || 0); });
+  });
+  var indByParent = {};
+  indicators.forEach(function (ind) { (indByParent[String(ind.parent_id)] = indByParent[String(ind.parent_id)] || []).push(ind); });
+  var tasksByAct = {};
+  tasks.forEach(function (t) { (tasksByAct[String(t.activity_id)] = tasksByAct[String(t.activity_id)] || []).push(t); });
+  var measByInd = {};
+  measurements.forEach(function (m) { (measByInd[String(m.indicator_id)] = measByInd[String(m.indicator_id)] || []).push(m); });
+  var ctx = { byParent: byParent, indByParent: indByParent, tasksByAct: tasksByAct, measByInd: measByInd, project: p,
+              myEmail: myEmail, myRole: myRole };
+  var roots = byParent["__root__"] || [];
+  var html = (roots).map(function (n) { return renderNode(n, ctx, 0); }).join("");
+  document.getElementById("tree").innerHTML = html || '<div class="empty state">Logframe порожній.</div>';
+  bindTree();
 }
 
 function card(n, label, cls, filter) {
@@ -986,7 +1073,7 @@ function renderTasks(tasks, ctx, actNode) {
     var canDelete = ctx.myRole === "lead" || amParticipant ||
                     String(t.created_by || "").toLowerCase().trim() === ctx.myEmail;
     var nextStatus = done ? "pending" : "done";
-    return '<div class="task ' + (done ? 'done' : '') + (ovd ? ' overdue' : '') + (stale ? ' stale-node' : '') + '">' +
+    return '<div class="task ' + (done ? 'done' : '') + (ovd ? ' overdue' : '') + (stale ? ' stale-node' : '') + '" data-task-row="' + esc(t.id) + '">' +
         '<span class="box' + (canEdit ? ' editable' : '') + '"' +
           (canEdit ? ' data-task="' + esc(t.id) + '" data-next="' + nextStatus + '" title="' + (done ? 'Відкрити задачу' : 'Позначити виконаною') + '"' : ' title="лише учасники можуть змінювати"') +
         '></span>' +
