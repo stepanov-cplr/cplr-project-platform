@@ -74,6 +74,7 @@
   .role-tag.part { background: var(--line-soft); color: var(--ink-soft); }
   .row .body { flex: 1; min-width: 0; }
   .row .title { font-size: 14.5px; }
+  .act-code { display: inline-block; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 12px; color: var(--accent); background: var(--brand-soft); border-radius: 5px; padding: 1px 6px; margin-right: 2px; vertical-align: middle; }
   .row .meta { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
   .row .when { text-align: right; flex-shrink: 0; white-space: nowrap; }
   .row .when .d { font-size: 13px; }
@@ -252,7 +253,8 @@ function render(d) {
           ? '<span class="role-tag owner">я відповідальний</span>'
           : (t.owner_name || t.owner_short ? '<span class="role-tag part">відповідальний: ' + esc(t.owner_name || t.owner_short) + '</span>' : '');
         var rowCls = (t.is_owner ? 'mine ' : 'support ') + f.cls;
-        return '<div class="row ' + rowCls + '" data-task-idx="' + i + '"><div class="body"><div class="title">' + esc(t.title) +
+        var actCodeTag = t.activity_code ? '<span class="act-code">' + esc(t.activity_code) + '</span> ' : '';
+        return '<div class="row ' + rowCls + '" data-task-idx="' + i + '"><div class="body"><div class="title">' + actCodeTag + esc(t.title) +
           '</div><div class="meta">' + esc(t.project) + (t.conditional ? ' · за потреби' : '') + ' ' + roleTag +
           '</div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + fmtDate(t.due_date) + '</div></div><span class="chev">›</span></div>' +
           '<div class="task-details hidden" data-detail-idx="' + i + '"></div>';
@@ -314,7 +316,10 @@ function taskDetailHtml(t) {
   if (t.participants_names && t.participants_names.length) {
     rows += line("Учасники", esc(t.participants_names.join(", ")));
   }
-  if (t.activity) rows += line("Активність", esc(t.activity));
+  if (t.activity || t.activity_code) {
+    var actVal = (t.activity_code ? '<b>' + esc(t.activity_code) + '</b> ' : '') + esc(t.activity || "");
+    rows += line("Активність", actVal);
+  }
   rows += line("Проєкт", esc(t.project));
   rows += line("Дедлайн", t.due_date ? fmtDate(t.due_date) : "—");
   if (t.conditional) rows += line("Тип", "необов’язкова (за потреби)");
@@ -322,7 +327,8 @@ function taskDetailHtml(t) {
     ? '<div class="td-notes"><div class="td-label">Коментар</div><div class="td-notes-text">' + esc(t.notes) + '</div></div>'
     : '<div class="td-notes"><div class="td-notes-text td-empty-note">Коментаря немає</div></div>';
   var link = t.project_id
-    ? '<a class="td-open" href="dashboard.html?project=' + encodeURIComponent(t.project_id) + '">Відкрити в дашборді →</a>'
+    ? '<a class="td-open" href="dashboard.html?project=' + encodeURIComponent(t.project_id) +
+        (t.id ? '&task=' + encodeURIComponent(t.id) : '') + '">Відкрити в дашборді →</a>'
     : '';
   return '<div class="td-grid">' + rows + '</div>' + notesBlock + link;
 }
