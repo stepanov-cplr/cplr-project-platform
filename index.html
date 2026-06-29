@@ -48,14 +48,27 @@
   .list { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-bottom: 28px; }
   .row { display: flex; align-items: center; gap: 14px; padding: 13px 16px; border-top: 1px solid var(--line-soft); }
   .row:first-child { border-top: none; }
-  a.row { text-decoration: none; color: inherit; cursor: pointer; transition: background .12s; }
-  a.row:hover { background: var(--bg); }
-  .row .chev { flex-shrink: 0; color: var(--ink-faint); font-size: 16px; line-height: 1; margin-left: 2px; }
-  a.row:hover .chev { color: var(--accent); }
+  a.row, .row[data-task-idx] { text-decoration: none; color: inherit; cursor: pointer; transition: background .12s; }
+  a.row:hover, .row[data-task-idx]:hover { background: var(--bg); }
+  .row .chev { flex-shrink: 0; color: var(--ink-faint); font-size: 16px; line-height: 1; margin-left: 2px; transition: transform .15s, color .12s; }
+  a.row:hover .chev, .row[data-task-idx]:hover .chev { color: var(--accent); }
+  .row.expanded .chev { transform: rotate(90deg); color: var(--accent); }
   /* мої (owner) vs допоміжні (учасник) */
-  a.row.support { opacity: 0.62; }
-  a.row.support:hover { opacity: 1; }
-  a.row.mine .title { font-weight: 600; }
+  a.row.support, .row.support[data-task-idx] { opacity: 0.62; }
+  a.row.support:hover, .row.support[data-task-idx]:hover, .row.support.expanded { opacity: 1; }
+  a.row.mine .title, .row.mine .title { font-weight: 600; }
+  /* деталі задачі (розкривні) */
+  .task-details { padding: 4px 16px 14px 16px; background: var(--bg); border-top: 1px solid var(--line-soft); }
+  .task-details.hidden { display: none; }
+  .td-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 6px 0 10px; }
+  .td-line { display: contents; }
+  .td-label { font-size: 11.5px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .03em; padding-top: 2px; }
+  .td-val { font-size: 13px; color: var(--ink); }
+  .td-notes { margin-bottom: 10px; }
+  .td-notes-text { font-size: 13px; color: var(--ink); white-space: pre-wrap; line-height: 1.45; margin-top: 3px; }
+  .td-empty-note { color: var(--ink-faint); font-style: italic; }
+  .td-open { display: inline-block; font-size: 12.5px; font-weight: 600; color: var(--accent); text-decoration: none; }
+  .td-open:hover { text-decoration: underline; }
   .role-tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; margin-left: 4px; vertical-align: middle; }
   .role-tag.owner { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
   .role-tag.part { background: var(--line-soft); color: var(--ink-soft); }
@@ -233,18 +246,19 @@ function render(d) {
   var tasks = d.tasks || [];
   document.getElementById("taskCnt").textContent = tasks.length ? "(" + tasks.length + ")" : "";
   document.getElementById("taskList").innerHTML = tasks.length
-    ? tasks.map(function (t) {
+    ? tasks.map(function (t, i) {
         var f = fmtDays(t.days);
-        var href = t.project_id ? 'dashboard.html?project=' + encodeURIComponent(t.project_id) : '#';
         var roleTag = t.is_owner
           ? '<span class="role-tag owner">я відповідальний</span>'
-          : (t.owner_short ? '<span class="role-tag part">відповідальний: ' + esc(t.owner_short) + '</span>' : '');
+          : (t.owner_name || t.owner_short ? '<span class="role-tag part">відповідальний: ' + esc(t.owner_name || t.owner_short) + '</span>' : '');
         var rowCls = (t.is_owner ? 'mine ' : 'support ') + f.cls;
-        return '<a class="row ' + rowCls + '" href="' + href + '"><div class="body"><div class="title">' + esc(t.title) +
+        return '<div class="row ' + rowCls + '" data-task-idx="' + i + '"><div class="body"><div class="title">' + esc(t.title) +
           '</div><div class="meta">' + esc(t.project) + (t.conditional ? ' · за потреби' : '') + ' ' + roleTag +
-          '</div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + fmtDate(t.due_date) + '</div></div><span class="chev">›</span></a>';
+          '</div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + fmtDate(t.due_date) + '</div></div><span class="chev">›</span></div>' +
+          '<div class="task-details hidden" data-detail-idx="' + i + '"></div>';
       }).join("")
     : '<div class="empty">Немає відкритих задач. Чисто.</div>';
+  bindTaskRows(tasks);
 
   var reps = d.reports || [];
   document.getElementById("repCnt").textContent = reps.length ? "(" + reps.length + ")" : "";
@@ -268,6 +282,49 @@ function render(d) {
           '<div class="meta">відкрити дашборд проєкту</div></div><span class="chev">›</span></a>';
       }).join("")
     : '<div class="empty">Ви ще не маєте доступу до проєктів.</div>';
+}
+
+// Розкривання деталей задачі на «Мій понеділок» (клік по рядку).
+function bindTaskRows(tasks) {
+  document.querySelectorAll('#taskList .row[data-task-idx]').forEach(function (row) {
+    row.addEventListener("click", function () {
+      var idx = row.getAttribute("data-task-idx");
+      var detail = document.querySelector('#taskList .task-details[data-detail-idx="' + idx + '"]');
+      if (!detail) return;
+      if (!detail.classList.contains("hidden")) {
+        detail.classList.add("hidden"); detail.innerHTML = ""; row.classList.remove("expanded"); return;
+      }
+      // згорнути інші
+      document.querySelectorAll('#taskList .task-details').forEach(function (d) { d.classList.add("hidden"); d.innerHTML = ""; });
+      document.querySelectorAll('#taskList .row.expanded').forEach(function (r) { r.classList.remove("expanded"); });
+      detail.innerHTML = taskDetailHtml(tasks[Number(idx)]);
+      detail.classList.remove("hidden");
+      row.classList.add("expanded");
+    });
+  });
+}
+
+function taskDetailHtml(t) {
+  if (!t) return "";
+  var rows = "";
+  function line(label, val) {
+    return '<div class="td-line"><span class="td-label">' + esc(label) + '</span><span class="td-val">' + val + '</span></div>';
+  }
+  rows += line("Відповідальний", esc(t.owner_name || t.owner_short || "—"));
+  if (t.participants_names && t.participants_names.length) {
+    rows += line("Учасники", esc(t.participants_names.join(", ")));
+  }
+  if (t.activity) rows += line("Активність", esc(t.activity));
+  rows += line("Проєкт", esc(t.project));
+  rows += line("Дедлайн", t.due_date ? fmtDate(t.due_date) : "—");
+  if (t.conditional) rows += line("Тип", "необов’язкова (за потреби)");
+  var notesBlock = t.notes
+    ? '<div class="td-notes"><div class="td-label">Коментар</div><div class="td-notes-text">' + esc(t.notes) + '</div></div>'
+    : '<div class="td-notes"><div class="td-notes-text td-empty-note">Коментаря немає</div></div>';
+  var link = t.project_id
+    ? '<a class="td-open" href="dashboard.html?project=' + encodeURIComponent(t.project_id) + '">Відкрити в дашборді →</a>'
+    : '';
+  return '<div class="td-grid">' + rows + '</div>' + notesBlock + link;
 }
 
 window.addEventListener("load", function () {
