@@ -190,7 +190,25 @@
   .team-table td { padding: 8px 12px; border-bottom: 1px solid var(--line-soft); }
   .team-table tr:last-child td { border-bottom: none; }
   .team-table .tm-name { font-weight: 600; color: var(--ink); }
-  .team-table .tm-email { color: var(--ink-soft); font-size: 12px; }
+  .team-table .tm-email { color: var(--ink-soft); font-size: 11.5px; font-weight: 400; margin-top: 1px; }
+  .team-table .tm-func { color: var(--ink-soft); font-size: 12.5px; line-height: 1.4; }
+  .team-table .tm-nodesc { color: var(--ink-faint); font-style: italic; }
+  .tm-edit { font: inherit; font-size: 12px; line-height: 1; padding: 2px 6px; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--ink-faint); cursor: pointer; }
+  .tm-edit:hover { background: var(--brand-soft); color: var(--brand); border-color: var(--line); }
+  .tm-form { padding: 4px 0 6px; }
+  .tm-form input, .tm-form textarea { font: inherit; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; background: #fff; width: 100%; box-sizing: border-box; margin-bottom: 6px; resize: vertical; }
+  .tm-form-actions { display: flex; gap: 8px; }
+  .tm-save { font: inherit; font-size: 12.5px; padding: 6px 14px; border: none; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+  .tm-save:disabled { opacity: .5; cursor: default; }
+  .tm-cancel { font: inherit; font-size: 12.5px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink-soft); cursor: pointer; }
+  .tm-form-row.hidden { display: none; }
+  /* вибір відповідального/учасників у формі задачі */
+  .task-form .tf-pick-lbl { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-soft); flex: 1; }
+  .task-form .tf-owner { flex: 1; min-width: 160px; }
+  .tf-parts-wrap { margin-bottom: 10px; }
+  .tf-parts-cap { font-size: 12px; color: var(--ink-soft); margin-bottom: 5px; }
+  .tf-part { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink); margin: 0 14px 5px 0; cursor: pointer; }
+  .tf-part input { width: auto; }
   .team-role { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
   .team-role.lead { background: var(--brand-soft); color: var(--brand); }
   .team-role.finance { background: #fef3c7; color: #92400e; }
@@ -530,7 +548,7 @@ function renderProject(d) {
   renderReports("repNarr", reports.filter(function (r) { return r.kind === "narrative"; }), "narrative", isLeadView, p.id);
 
   // ── команда проєкту ──
-  renderTeam(d.access || []);
+  renderTeam(d.access || [], p.id);
 
   // ── Logframe-дерево ──
   // будуємо мапу parent_id -> [діти], сортуємо за display_order
@@ -571,35 +589,114 @@ function roleLabel(role) {
   if (r === "member") return "учасник";
   return role || "—";
 }
-function renderTeam(access) {
+
+// Команда проєкту тримається тут — для випадайки у формі задачі й перерендеру.
+var TEAM = [];
+var TEAM_PID = "";
+
+// Зручний підпис учасника: ПІБ, інакше частина email до @.
+function memberLabel(a) {
+  var fn = String(a.full_name || "").trim();
+  return fn || String(a.email || "").split("@")[0];
+}
+
+// Підпис відповідального за email (шукає ПІБ у списку команди).
+function ownerDisplay(email) {
+  var em = String(email || "").toLowerCase().trim();
+  if (!em) return "";
+  var m = TEAM.filter(function (a) { return String(a.email || "").toLowerCase().trim() === em; })[0];
+  return m ? memberLabel(m) : em.split("@")[0];
+}
+
+function renderTeam(access, projectId) {
+  TEAM = access || [];
+  TEAM_PID = projectId || "";
   var el = document.getElementById("teamPanel");
   if (!el) return;
-  if (!access.length) { el.innerHTML = '<div class="team-empty">Список учасників порожній.</div>'; return; }
-  // порядок: координатори → фінанси → учасники, всередині за email
+  if (!TEAM.length) { el.innerHTML = '<div class="team-empty">Список учасників порожній.</div>'; return; }
+  // порядок: координатори → фінанси → учасники, всередині за ПІБ/email
   var order = { lead: 0, finance: 1, member: 2 };
-  var sorted = access.slice().sort(function (a, b) {
+  var sorted = TEAM.slice().sort(function (a, b) {
     var ra = order[String(a.role).toLowerCase()] != null ? order[String(a.role).toLowerCase()] : 9;
     var rb = order[String(b.role).toLowerCase()] != null ? order[String(b.role).toLowerCase()] : 9;
     if (ra !== rb) return ra - rb;
-    return String(a.email).localeCompare(String(b.email));
+    return memberLabel(a).localeCompare(memberLabel(b));
   });
   var rows = sorted.map(function (a) {
     var role = String(a.role || "").toLowerCase();
     var roleCls = role === "lead" ? "lead" : role === "finance" ? "finance" : "member";
-    var name = String(a.email || "").split("@")[0];
     var budget = isTrue(a.budget_access)
       ? '<span class="team-budget" title="має доступ до бюджету">бюджет</span>' : '';
+    var name = esc(memberLabel(a));
+    var fn = String(a.full_name || "").trim();
+    var emailLine = fn ? '<div class="tm-email">' + esc(a.email || "") + '</div>' : '';
+    var desc = String(a.function_desc || "").trim();
+    var descHtml = desc ? esc(desc) : '<span class="tm-nodesc">— не вказано —</span>';
+    // право редагувати: lead/admin будь-кого, або сам свій рядок
+    var canEdit = (myRole === "lead") ||
+                  (String(a.email || "").toLowerCase().trim() === myEmail);
+    var editBtn = canEdit
+      ? '<button class="tm-edit" data-email="' + esc(a.email || "") + '" title="Редагувати ПІБ і функцію">✎</button>'
+      : '';
     return '<tr>' +
-      '<td class="tm-name">' + esc(name) + '</td>' +
-      '<td class="tm-email">' + esc(a.email || "") + '</td>' +
-      '<td class="tm-role"><span class="team-role ' + roleCls + '">' + esc(roleLabel(a.role)) + '</span> ' + budget + '</td>' +
-    '</tr>';
+      '<td class="tm-name">' + name + emailLine + '</td>' +
+      '<td class="tm-func">' + descHtml + '</td>' +
+      '<td class="tm-role"><span class="team-role ' + roleCls + '">' + esc(roleLabel(a.role)) + '</span> ' + budget + ' ' + editBtn + '</td>' +
+    '</tr>' +
+    '<tr class="tm-form-row hidden" data-form-email="' + esc(a.email || "") + '"><td colspan="3"></td></tr>';
   }).join("");
   el.innerHTML = '<div class="team-table-wrap"><table class="team-table">' +
-    '<thead><tr><th>Ім’я</th><th>Email</th><th>Роль</th></tr></thead>' +
+    '<thead><tr><th>ПІБ</th><th>Функція в проєкті</th><th>Роль</th></tr></thead>' +
     '<tbody>' + rows + '</tbody></table>' +
-    '<div class="team-hint">Щоб призначити задачу — оберіть відповідального з цього списку у формі задачі (поле координатора). Склад команди змінюється в аркуші Access.</div>' +
+    '<div class="team-hint">ПІБ і функцію можна редагувати тут (✎): координатор — будь-кого, кожен — свій рядок. Ролі й доступ до бюджету змінюються в аркуші Access.</div>' +
     '</div>';
+  bindTeam();
+}
+
+function bindTeam() {
+  var el = document.getElementById("teamPanel");
+  if (!el) return;
+  el.querySelectorAll(".tm-edit").forEach(function (btn) {
+    btn.addEventListener("click", function () { openMemberForm(btn.getAttribute("data-email")); });
+  });
+}
+
+function openMemberForm(email) {
+  var el = document.getElementById("teamPanel");
+  var formRow = el.querySelector('.tm-form-row[data-form-email="' + cssEsc(email) + '"]');
+  if (!formRow) return;
+  var cell = formRow.querySelector("td");
+  if (!formRow.classList.contains("hidden")) { formRow.classList.add("hidden"); cell.innerHTML = ""; return; }
+  // згорнути інші відкриті форми
+  el.querySelectorAll(".tm-form-row").forEach(function (r) { r.classList.add("hidden"); r.querySelector("td").innerHTML = ""; });
+  var m = TEAM.filter(function (a) { return String(a.email || "").toLowerCase().trim() === String(email).toLowerCase().trim(); })[0] || {};
+  cell.innerHTML =
+    '<div class="tm-form">' +
+      '<input class="tm-fn" type="text" value="' + esc(m.full_name || "") + '" placeholder="ПІБ українською (напр. Олена Виноградова)">' +
+      '<textarea class="tm-fd" rows="2" placeholder="функція в проєкті — напр. сприяння інституційному діалогу, експертна підтримка комітетів">' + esc(m.function_desc || "") + '</textarea>' +
+      '<div class="tm-form-actions">' +
+        '<button class="tm-save" data-email="' + esc(email) + '">Зберегти</button>' +
+        '<button class="tm-cancel" data-email="' + esc(email) + '">Скасувати</button>' +
+      '</div>' +
+    '</div>';
+  formRow.classList.remove("hidden");
+  cell.querySelector(".tm-save").addEventListener("click", function () { submitMemberInfo(email); });
+  cell.querySelector(".tm-cancel").addEventListener("click", function () { formRow.classList.add("hidden"); cell.innerHTML = ""; });
+}
+
+function submitMemberInfo(email) {
+  var el = document.getElementById("teamPanel");
+  var formRow = el.querySelector('.tm-form-row[data-form-email="' + cssEsc(email) + '"]');
+  if (!formRow) return;
+  var fn = formRow.querySelector(".tm-fn").value.trim();
+  var fd = formRow.querySelector(".tm-fd").value.trim();
+  var saveBtn = formRow.querySelector(".tm-save");
+  saveBtn.disabled = true; saveBtn.textContent = "…";
+  apiPost("upsertMemberInfo", { projectId: TEAM_PID, email: email, full_name: fn, function_desc: fd })
+    .then(function (res) {
+      if (res && res.ok) { toast("Збережено", "ok"); reloadCurrent(); }
+      else { toast(errMsg(res), "err"); saveBtn.disabled = false; saveBtn.textContent = "Зберегти"; }
+    });
 }
 
 function renderReports(elId, list, kind, isLead, projectId) {
@@ -729,7 +826,7 @@ function renderTasks(tasks, ctx, actNode) {
     var done = String(t.status).toLowerCase() === "done";
     var du = daysUntil(t.due_date);
     var ovd = !done && !isTrue(t.conditional) && du !== null && du < 0;
-    var who = String(t.owner_email || "").split("@")[0];
+    var who = ownerDisplay(t.owner_email);
     var ts = daysSince(t.ts);
     var stale = !done && ts !== null && ts > STALE_DAYS;
     // право міняти статус (для показу): учасник АБО owner АБО lead. Реальна перевірка — на бекенді.
@@ -1063,12 +1160,36 @@ function taskFormHtml(opts) {
     depsBlock = '<div class="tf-deps-wrap"><div class="tf-deps-cap" style="color:var(--ink-faint)">Інших задач під цією активністю ще нема — залежностей не буде.</div></div>';
   }
 
-  var leadFields = isLead
-    ? '<div class="tf-row">' +
-        '<input class="tf-owner" type="text" value="' + esc(t.owner_email || "") + '" placeholder="головний відповідальний (email)">' +
-        '<input class="tf-parts" type="text" value="' + esc(t.participants || "") + '" placeholder="учасники через ; (a@x;b@x)">' +
-      '</div>'
-    : '';
+  // поточні учасники задачі (для відмітки чекбоксів)
+  var curParts = String(t.participants || "").toLowerCase().split(/[;,]/).map(function (s) { return s.trim(); }).filter(Boolean);
+  var curOwner = String(t.owner_email || "").toLowerCase().trim();
+
+  var leadFields = "";
+  if (isLead) {
+    if (TEAM.length) {
+      var ownerOpts = '<option value="">— оберіть відповідального —</option>' +
+        TEAM.map(function (a) {
+          var em = String(a.email || "").toLowerCase().trim();
+          return '<option value="' + esc(em) + '"' + (em === curOwner ? " selected" : "") + '>' + esc(memberLabel(a)) + '</option>';
+        }).join("");
+      var partsBoxes = TEAM.map(function (a) {
+        var em = String(a.email || "").toLowerCase().trim();
+        var on = curParts.indexOf(em) >= 0;
+        return '<label class="tf-part"><input type="checkbox" class="tf-part-box" value="' + esc(em) + '"' + (on ? " checked" : "") + '> ' + esc(memberLabel(a)) + '</label>';
+      }).join("");
+      leadFields =
+        '<div class="tf-row"><label class="tf-pick-lbl">Головний відповідальний:' +
+          '<select class="tf-owner">' + ownerOpts + '</select></label></div>' +
+        '<div class="tf-parts-wrap"><div class="tf-parts-cap">Учасники задачі (бачать і можуть змінювати статус):</div>' +
+          partsBoxes + '</div>';
+    } else {
+      // запасний варіант, якщо список команди порожній — лишаємо текстові поля
+      leadFields = '<div class="tf-row">' +
+          '<input class="tf-owner" type="text" value="' + esc(t.owner_email || "") + '" placeholder="головний відповідальний (email)">' +
+          '<input class="tf-parts" type="text" value="' + esc(t.participants || "") + '" placeholder="учасники через ; (a@x;b@x)">' +
+        '</div>';
+    }
+  }
 
   return '<div class="tf-row">' +
       '<input class="tf-title" type="text" value="' + esc(t.title || "") + '" placeholder="назва задачі">' +
@@ -1111,9 +1232,21 @@ function submitTask(mode, key) {
   var payload = { title: title, due_date: due, visible_to: vis, deps: deps, conditional: cond, notes: notes };
 
   var ownerEl = form.querySelector(".tf-owner");
-  if (ownerEl) { payload.owner_email = ownerEl.value.trim(); }
-  var partsEl = form.querySelector(".tf-parts");
-  if (partsEl) { payload.participants = partsEl.value.trim(); }
+  var owner = ownerEl ? ownerEl.value.trim() : "";
+  if (ownerEl) { payload.owner_email = owner; }
+
+  // учасники: або чекбокси зі списку команди, або (запасний) текстове поле
+  var partBoxes = form.querySelectorAll(".tf-part-box");
+  if (partBoxes.length) {
+    var picked = Array.prototype.slice.call(partBoxes).filter(function (b) { return b.checked; })
+      .map(function (b) { return b.value.trim(); });
+    // відповідальний завжди серед учасників (інакше не зможе міняти статус)
+    if (owner && picked.indexOf(owner.toLowerCase()) < 0) picked.unshift(owner);
+    payload.participants = picked.join(";");
+  } else {
+    var partsEl = form.querySelector(".tf-parts");
+    if (partsEl) { payload.participants = partsEl.value.trim(); }
+  }
 
   var saveBtn = form.querySelector(".tf-save");
   if (mode === "new") { payload.activityId = saveBtn.getAttribute("data-act"); }
