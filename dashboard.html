@@ -218,7 +218,7 @@
   .team-empty { font-size: 13px; color: var(--ink-faint); padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
   .task-form .tf-title { flex: 1; min-width: 180px; } .task-form .tf-due { width: 150px; }
   .task-form .tf-owner, .task-form .tf-parts { flex: 1; min-width: 160px; }
-  .task-form .tf-vis { flex: 1; min-width: 200px; } .task-form .tf-deps { flex: 1; min-width: 160px; }
+  .task-form .tf-deps { flex: 1; min-width: 160px; }
   .task-form .tf-cond { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-soft); margin-bottom: 10px; cursor: pointer; }
   .task-form .tf-cond-box { width: auto; }
   .task-form .tf-actions { display: flex; gap: 8px; }
@@ -1138,7 +1138,6 @@ function taskFormHtml(opts) {
   var isLead = myRole === "lead";
   var t = opts.mode === "edit" ? (opts.task || {}) : {};
   var key = opts.mode === "edit" ? ("task:" + opts.task.id) : ("new:" + opts.actId);
-  var vis = String(t.visible_to || "participants+coord");
 
   // activity_id поточної задачі (для нової — actId, для редагування — з самої задачі)
   var actId = opts.mode === "new" ? opts.actId : String(t.activity_id);
@@ -1199,12 +1198,6 @@ function taskFormHtml(opts) {
       '<textarea class="tf-notes" rows="2" placeholder="коментар до задачі (необов.) — деталі, посилання, контекст">' + esc(t.notes || "") + '</textarea>' +
     '</div>' +
     leadFields +
-    '<div class="tf-row">' +
-      '<select class="tf-vis">' +
-        '<option value="participants+coord"' + (vis==="participants+coord"?" selected":"") + '>видно: учасники + координатор</option>' +
-        '<option value="project"' + (vis==="project"?" selected":"") + '>видно: весь проєкт</option>' +
-      '</select>' +
-    '</div>' +
     depsBlock +
     '<label class="tf-cond"><input class="tf-cond-box" type="checkbox"' + (isTrue(t.conditional)?" checked":"") + '> Необов’язкова — виконується лише за потреби (не вважається простроченою)</label>' +
     '<div class="tf-actions">' +
@@ -1222,14 +1215,14 @@ function submitTask(mode, key) {
   var title = form.querySelector(".tf-title").value.trim();
   if (!title) { toast("Вкажіть назву задачі", "err"); return; }
   var due = form.querySelector(".tf-due").value; // "" або YYYY-MM-DD
-  var vis = form.querySelector(".tf-vis").value;
   var depEls = form.querySelectorAll(".tf-dep-box");
   var deps = Array.prototype.slice.call(depEls).filter(function (b) { return b.checked; })
     .map(function (b) { return b.value; }).join(";");
   var cond = form.querySelector(".tf-cond-box").checked;
   var notesEl = form.querySelector(".tf-notes");
   var notes = notesEl ? notesEl.value.trim() : "";
-  var payload = { title: title, due_date: due, visible_to: vis, deps: deps, conditional: cond, notes: notes };
+  // visible_to більше не задаємо у формі (поле приховане) — бекенд лишає типовий пресет
+  var payload = { title: title, due_date: due, deps: deps, conditional: cond, notes: notes };
 
   var ownerEl = form.querySelector(".tf-owner");
   var owner = ownerEl ? ownerEl.value.trim() : "";
