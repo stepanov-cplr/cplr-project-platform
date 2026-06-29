@@ -211,6 +211,13 @@ function esc(s) {
   });
 }
 
+// Уніфікований формат дати дд.мм.рррр (як на дашборді проєкту).
+function fmtDate(s) {
+  if (!s) return "—";
+  var d = new Date(s); if (isNaN(d)) return esc(s);
+  return d.toLocaleDateString("uk-UA", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 function render(d) {
   if (d.error) {
     document.getElementById("taskList").innerHTML = '<div class="state err">Помилка: ' + esc(d.error) + '</div>';
@@ -235,7 +242,7 @@ function render(d) {
         var rowCls = (t.is_owner ? 'mine ' : 'support ') + f.cls;
         return '<a class="row ' + rowCls + '" href="' + href + '"><div class="body"><div class="title">' + esc(t.title) +
           '</div><div class="meta">' + esc(t.project) + (t.conditional ? ' · за потреби' : '') + ' ' + roleTag +
-          '</div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + esc(t.due_date) + '</div></div><span class="chev">›</span></a>';
+          '</div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + fmtDate(t.due_date) + '</div></div><span class="chev">›</span></a>';
       }).join("")
     : '<div class="empty">Немає відкритих задач. Чисто.</div>';
 
@@ -248,7 +255,7 @@ function render(d) {
         var href = r.project_id ? 'dashboard.html?project=' + encodeURIComponent(r.project_id) : '#';
         return '<a class="row ' + f.cls + '" href="' + href + '"><div class="body"><div class="title">' + esc(r.label) +
           '</div><div class="meta">' + esc(r.project) + ' · <span class="pill ' + esc(r.kind) + '">' + kindLabel +
-          '</span></div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + esc(r.due_date) + '</div></div><span class="chev">›</span></a>';
+          '</span></div></div><div class="when"><div class="d">' + f.txt + '</div><div class="date">' + fmtDate(r.due_date) + '</div></div><span class="chev">›</span></a>';
       }).join("")
     : '<div class="empty">Немає найближчих звітів.</div>';
 
