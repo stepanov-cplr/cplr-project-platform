@@ -216,6 +216,44 @@
   .team-budget { font-size: 10px; font-weight: 600; color: var(--accent); background: #e7f0fb; border-radius: 4px; padding: 1px 6px; margin-left: 4px; }
   .team-hint { font-size: 11.5px; color: var(--ink-faint); padding: 9px 12px; background: var(--bg); border-top: 1px solid var(--line-soft); line-height: 1.45; }
   .team-empty { font-size: 13px; color: var(--ink-faint); padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+
+  /* додавання учасника */
+  .team-add { font: inherit; font-size: 12px; padding: 6px 14px; border: 1px dashed var(--line); border-radius: 7px; background: #fff; color: var(--accent); cursor: pointer; margin: 10px 0 0; }
+  .team-add:hover { background: var(--brand-soft); border-color: var(--accent); }
+  .team-add-form { margin-top: 8px; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+  .team-add-form.hidden { display: none; }
+  .am-row { display: flex; gap: 16px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .am-role-lbl { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-soft); }
+  .am-role { font: inherit; font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .am-budget-lbl { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-soft); cursor: pointer; }
+  .am-save { font: inherit; font-size: 12.5px; padding: 6px 14px; border: none; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+  .am-save:disabled { opacity: .5; cursor: default; }
+  .am-cancel { font: inherit; font-size: 12.5px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink-soft); cursor: pointer; }
+
+  /* клікабельні картки-лічильники */
+  .count.clickable { cursor: pointer; transition: transform .1s, box-shadow .12s; }
+  .count.clickable:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(37,40,104,.10); }
+  .count-arrow { font-size: 11px; opacity: .6; }
+
+  /* панель «всі задачі проєкту» */
+  .tasks-panel { position: fixed; inset: 0; background: rgba(20,25,45,.42); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; z-index: 50; overflow-y: auto; }
+  .tasks-panel.hidden { display: none; }
+  .tp-box { background: #fff; border-radius: 12px; width: 100%; max-width: 620px; box-shadow: 0 12px 40px rgba(20,25,45,.25); overflow: hidden; }
+  .tp-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 15px; font-weight: 600; color: var(--ink); }
+  .tp-count { color: var(--ink-faint); font-weight: 400; }
+  .tp-close { font: inherit; font-size: 16px; line-height: 1; border: none; background: none; color: var(--ink-soft); cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+  .tp-close:hover { background: var(--bg); }
+  .tp-body { padding: 8px 0; max-height: 64vh; overflow-y: auto; }
+  .tp-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 18px; border-bottom: 1px solid var(--line-soft); }
+  .tp-row:last-child { border-bottom: none; }
+  .tp-row.overdue { background: var(--danger-bg); }
+  .tp-title { font-size: 13.5px; color: var(--ink); font-weight: 500; }
+  .tp-notes { font-size: 12px; color: var(--ink-soft); margin-top: 3px; white-space: pre-wrap; line-height: 1.4; }
+  .tp-meta { text-align: right; white-space: nowrap; flex-shrink: 0; }
+  .tp-who { font-size: 12px; color: var(--ink-soft); }
+  .tp-when { font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
+  .tp-row.overdue .tp-when { color: var(--danger); font-weight: 600; }
+  .tp-empty { padding: 24px 18px; text-align: center; color: var(--ink-faint); font-size: 13px; }
   .task-form .tf-title { flex: 1; min-width: 180px; } .task-form .tf-due { width: 150px; }
   .task-form .tf-owner, .task-form .tf-parts { flex: 1; min-width: 160px; }
   .task-form .tf-deps { flex: 1; min-width: 160px; }
@@ -306,6 +344,8 @@
     <div class="tree" id="tree"><div class="state">—</div></div>
   </div>
 </div>
+
+<div id="tasksPanel" class="tasks-panel hidden"></div>
 
 <script>
 // ════════════════════════════════════════════════════════
@@ -526,11 +566,16 @@ function renderProject(d) {
     return ds !== null && ds > STALE_DAYS;
   });
 
+  // зберігаємо для панелі «всі задачі проєкту»
+  ALL_OPEN_TASKS = openTasks;
+  ALL_OVERDUE_TASKS = overdueTasks;
+
   document.getElementById("counts").innerHTML =
-    card(overdueTasks.length, "Прострочені задачі", overdueTasks.length ? "danger" : "ok") +
-    card(openTasks.length, "Відкриті задачі", "") +
-    card(overdueReports.length, "Прострочені звіти", overdueReports.length ? "danger" : "ok") +
-    card(indicators.length, "Індикаторів", "");
+    card(overdueTasks.length, "Прострочені задачі", overdueTasks.length ? "danger" : "ok", "overdue") +
+    card(openTasks.length, "Відкриті задачі", "", "open") +
+    card(overdueReports.length, "Прострочені звіти", overdueReports.length ? "danger" : "ok", "") +
+    card(indicators.length, "Індикаторів", "", "");
+  bindCounts();
 
   // ── тривога несвіжості ──
   var sa = document.getElementById("staleAlert");
@@ -571,8 +616,57 @@ function renderProject(d) {
   bindReports();
 }
 
-function card(n, label, cls) {
-  return '<div class="count ' + cls + '"><div class="n">' + n + '</div><div class="l">' + label + '</div></div>';
+function card(n, label, cls, filter) {
+  var clk = (filter === "open" || filter === "overdue") && n > 0;
+  return '<div class="count ' + cls + (clk ? ' clickable' : '') + '"' +
+    (clk ? ' data-filter="' + filter + '" title="Показати список"' : '') +
+    '><div class="n">' + n + '</div><div class="l">' + label + (clk ? ' <span class="count-arrow">→</span>' : '') + '</div></div>';
+}
+
+var ALL_OPEN_TASKS = [], ALL_OVERDUE_TASKS = [];
+
+function bindCounts() {
+  document.querySelectorAll("#counts .count.clickable").forEach(function (c) {
+    c.addEventListener("click", function () { openTasksPanel(c.getAttribute("data-filter")); });
+  });
+}
+
+function ownerNameByEmail(email) { return ownerDisplay(email); }
+
+function openTasksPanel(filter) {
+  var list = filter === "overdue" ? ALL_OVERDUE_TASKS : ALL_OPEN_TASKS;
+  var heading = filter === "overdue" ? "Прострочені задачі" : "Усі відкриті задачі проєкту";
+  list = list.slice().sort(function (a, b) {
+    var da = daysUntil(a.due_date), db = daysUntil(b.due_date);
+    return (da === null ? 99999 : da) - (db === null ? 99999 : db);
+  });
+  var rows = list.length ? list.map(function (t) {
+    var du = daysUntil(t.due_date);
+    var ovd = !isTrue(t.conditional) && du !== null && du < 0;
+    var when = ovd ? ("прострочено " + Math.abs(du) + " дн.") : (du !== null ? ("за " + du + " дн. · " + fmtDate(t.due_date)) : "без дедлайну");
+    var who = ownerDisplay(t.owner_email);
+    return '<div class="tp-row' + (ovd ? ' overdue' : '') + '">' +
+      '<div class="tp-main"><div class="tp-title">' + esc(t.title) +
+        (isTrue(t.conditional) ? ' <span class="manual-tag" style="background:var(--warn-bg);color:var(--warn)">за потреби</span>' : '') + '</div>' +
+        (t.notes ? '<div class="tp-notes">' + esc(t.notes) + '</div>' : '') + '</div>' +
+      '<div class="tp-meta"><div class="tp-who">' + esc(who) + '</div><div class="tp-when">' + esc(when) + '</div></div>' +
+    '</div>';
+  }).join("") : '<div class="tp-empty">Немає задач у цій категорії.</div>';
+
+  var overlay = document.getElementById("tasksPanel");
+  overlay.innerHTML =
+    '<div class="tp-box">' +
+      '<div class="tp-head"><span>' + esc(heading) + ' <span class="tp-count">(' + list.length + ')</span></span>' +
+        '<button class="tp-close" title="Закрити">✕</button></div>' +
+      '<div class="tp-body">' + rows + '</div>' +
+    '</div>';
+  overlay.classList.remove("hidden");
+  overlay.querySelector(".tp-close").addEventListener("click", closeTasksPanel);
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) closeTasksPanel(); });
+}
+function closeTasksPanel() {
+  var overlay = document.getElementById("tasksPanel");
+  overlay.classList.add("hidden"); overlay.innerHTML = "";
 }
 function plural(n, one, few, many) {
   var m10 = n % 10, m100 = n % 100;
@@ -645,10 +739,15 @@ function renderTeam(access, projectId) {
     '</tr>' +
     '<tr class="tm-form-row hidden" data-form-email="' + esc(a.email || "") + '"><td colspan="3"></td></tr>';
   }).join("");
+  var addMemberBtn = (myRole === "lead")
+    ? '<button class="team-add" id="teamAddBtn">+ учасник</button>' +
+      '<div class="team-add-form hidden" id="teamAddForm"></div>'
+    : '';
   el.innerHTML = '<div class="team-table-wrap"><table class="team-table">' +
     '<thead><tr><th>ПІБ</th><th>Функція в проєкті</th><th>Роль</th></tr></thead>' +
     '<tbody>' + rows + '</tbody></table>' +
-    '<div class="team-hint">ПІБ і функцію можна редагувати тут (✎): координатор — будь-кого, кожен — свій рядок. Ролі й доступ до бюджету змінюються в аркуші Access.</div>' +
+    '<div class="team-hint">ПІБ і функцію можна редагувати тут (✎): координатор — будь-кого, кожен — свій рядок. Координатор також додає учасників і змінює ролі тут.</div>' +
+    addMemberBtn +
     '</div>';
   bindTeam();
 }
@@ -658,6 +757,57 @@ function bindTeam() {
   if (!el) return;
   el.querySelectorAll(".tm-edit").forEach(function (btn) {
     btn.addEventListener("click", function () { openMemberForm(btn.getAttribute("data-email")); });
+  });
+  var addBtn = el.querySelector("#teamAddBtn");
+  if (addBtn) addBtn.addEventListener("click", toggleAddMemberForm);
+}
+
+function toggleAddMemberForm() {
+  var form = document.getElementById("teamAddForm");
+  if (!form) return;
+  if (!form.classList.contains("hidden")) { form.classList.add("hidden"); form.innerHTML = ""; return; }
+  form.innerHTML =
+    '<div class="tm-form">' +
+      '<input class="am-email" type="email" placeholder="email учасника (напр. ivanenko@pravo.org.ua)">' +
+      '<input class="am-fn" type="text" placeholder="ПІБ українською">' +
+      '<textarea class="am-fd" rows="2" placeholder="функція в проєкті (необов.)"></textarea>' +
+      '<div class="am-row">' +
+        '<label class="am-role-lbl">Роль:' +
+          '<select class="am-role">' +
+            '<option value="member">учасник</option>' +
+            '<option value="lead">координатор</option>' +
+            '<option value="finance">фінанси</option>' +
+          '</select></label>' +
+        '<label class="am-budget-lbl"><input type="checkbox" class="am-budget"> доступ до бюджету</label>' +
+      '</div>' +
+      '<div class="tm-form-actions">' +
+        '<button class="am-save">Додати</button>' +
+        '<button class="am-cancel">Скасувати</button>' +
+      '</div>' +
+    '</div>';
+  form.classList.remove("hidden");
+  form.querySelector(".am-save").addEventListener("click", submitAddMember);
+  form.querySelector(".am-cancel").addEventListener("click", function () { form.classList.add("hidden"); form.innerHTML = ""; });
+}
+
+function submitAddMember() {
+  var form = document.getElementById("teamAddForm");
+  if (!form) return;
+  var email = form.querySelector(".am-email").value.trim().toLowerCase();
+  if (!email) { toast("Вкажіть email", "err"); return; }
+  var payload = {
+    projectId: TEAM_PID,
+    email: email,
+    role: form.querySelector(".am-role").value,
+    budget_access: form.querySelector(".am-budget").checked,
+    full_name: form.querySelector(".am-fn").value.trim(),
+    function_desc: form.querySelector(".am-fd").value.trim()
+  };
+  var btn = form.querySelector(".am-save");
+  btn.disabled = true; btn.textContent = "…";
+  apiPost("addMember", payload).then(function (res) {
+    if (res && res.ok) { toast("Учасника додано", "ok"); reloadCurrent(); }
+    else { toast(errMsg(res), "err"); btn.disabled = false; btn.textContent = "Додати"; }
   });
 }
 
